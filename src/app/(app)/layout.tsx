@@ -19,7 +19,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile) redirect("/login");
 
-  const items: NavItem[] = [{ href: "/", label: "Accueil" }, { href: "/projets", label: "Projets" }];
+  const { count: unreadCount } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("lu", false);
+
+  const items: NavItem[] = [
+    { href: "/", label: "Accueil" },
+    { href: "/projets", label: "Projets" },
+    { href: "/notifications", label: "Notifications", badge: unreadCount ?? 0 },
+  ];
   if (profile.role === "admin" || profile.role === "partenaire") {
     items.push({ href: "/invitations/new", label: "Inviter" });
   }

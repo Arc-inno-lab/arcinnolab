@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, Projet, MembreProjet, EtapeProjet } from "@/lib/types";
+import type { Profile, Projet, MembreProjet, EtapeProjet, MessageProjet } from "@/lib/types";
 import { ETAT_LABELS } from "@/lib/types";
 import { InvitationForm } from "../../invitations/new/InvitationForm";
 import { EtatSelect } from "./EtatSelect";
 import { EtapesSection } from "./EtapesSection";
+import { MessagesProjetSection } from "./MessagesProjetSection";
 
 type ProjetAvecReferent = Projet & {
   referent: Pick<Profile, "nom" | "prenom" | "email"> | null;
@@ -41,6 +42,13 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     .eq("projet_id", id)
     .order("ordre", { ascending: true })
     .returns<EtapeProjet[]>();
+
+  const { data: messages } = await supabase
+    .from("messages_projet")
+    .select("*, auteur:profiles(nom,prenom,role)")
+    .eq("projet_id", id)
+    .order("created_at", { ascending: true })
+    .returns<MessageProjet[]>();
 
   const isReferent = profile?.id === projet.id_partenaire_createur;
   const isAdmin = profile?.role === "admin";
@@ -108,6 +116,8 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       </section>
 
       <EtapesSection projetId={projet.id} etapes={etapes ?? []} peutGerer={peutGerer} />
+
+      <MessagesProjetSection projetId={projet.id} messages={messages ?? []} />
 
       {peutGerer && (
         <section aria-labelledby="inviter-heading">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavItem = { href: string; label: string };
+export type NavItem = { href: string; label: string; badge?: number };
 
 export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -28,6 +28,17 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             }
           >
             {item.label}
+            {!!item.badge && (
+              <span
+                className="ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                style={{
+                  background: active ? "rgba(255,255,255,0.3)" : "var(--color-danger)",
+                  color: "#fff",
+                }}
+              >
+                {item.badge}
+              </span>
+            )}
           </Link>
         );
       })}

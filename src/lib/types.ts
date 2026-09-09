@@ -62,6 +62,27 @@ export const ETAPE_STATUT_LABELS: Record<EtapeStatut, string> = {
   refusee: "Refusée",
 };
 
+export interface MessageProjet {
+  id: string;
+  projet_id: string;
+  auteur_id: string;
+  contenu: string;
+  created_at: string;
+  auteur?: Pick<Profile, "nom" | "prenom" | "role"> | null;
+}
+
+export type NotificationType = "etape_ajoutee" | "etape_statut" | "message_projet" | "invitation_acceptee";
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  titre: string;
+  lien: string | null;
+  lu: boolean;
+  created_at: string;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrateur",
   partenaire: "Partenaire ArcInnoLab",

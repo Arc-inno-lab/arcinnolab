@@ -130,18 +130,24 @@ export async function updateProjetEtat(projetId: string, etat: string): Promise<
 // etapes_projet_write (admin ou is_project_referent()).
 // ------------------------------------------------------------------
 export async function createEtape(projetId: string, titre: string): Promise<void> {
-  if (!titre.trim()) return;
+  const texte = titre.trim();
+  if (!texte) return;
   const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const { count } = await supabase
     .from("etapes_projet")
     .select("id", { count: "exact", head: true })
     .eq("projet_id", projetId);
   await supabase.from("etapes_projet").insert({
     projet_id: projetId,
-    titre: titre.trim(),
+    titre: texte,
     ordre: count ?? 0,
   });
   revalidatePath(`/projets/${projetId}`);
+
+  if (user) {
+    await notifyProjectTeam(supabase, projetId, user.id, "etape_ajoutee", `Nouvelle étape : « ${texte} »`);
+  }
 }
 
 // ------------------------------------------------------------------
@@ -156,7 +162,7 @@ export async function updateEtapeStatut(
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   const isTerminal = statut === "validee" || statut === "refusee";
-  await supabase
+  const { data: etape } = await supabase
     .from("etapes_projet")
     .update({
       statut,
@@ -164,8 +170,100 @@ export async function updateEtapeStatut(
       id_partenaire_validateur: isTerminal ? user?.id ?? null : null,
       date_validation: isTerminal ? new Date().toISOString() : null,
     })
-    .eq("id", etapeId);
+    .eq("id", etapeId)
+    .select("titre")
+    .single();
   revalidatePath(`/projets/${projetId}`);
+
+  if (isTerminal && user && etape) {
+    const label = statut === "validee" ? "validée" : "refusée";
+    await notifyProjectTeam(supabase, projetId, user.id, "etape_statut", `Étape « ${etape.titre} » ${label}`);
+  }
+}
+
+// ------------------------------------------------------------------
+// Notifications in-app : diffusion aux membres d'un projet (référent, partenaires additionnels,
+// porteurs), à l'exclusion de l'auteur de l'action. Insertion permissive côté RLS
+// (notifications_insert : authenticated, with check true) car le contenu est entièrement
+// maîtrisé par ces server actions sur une plateforme fermée.
+// ------------------------------------------------------------------
+async function notifyProjectTeam(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  projetId: string,
+  excludeUserId: string,
+  type: string,
+  titre: string
+): Promise<void> {
+  const [{ data: projet }, { data: membres }, { data: partenaires }] = await Promise.all([
+    supabase.from("projets").select("id_partenaire_createur").eq("id", projetId).maybeSingle(),
+    supabase.from("membres_projet").select("user_id").eq("projet_id", projetId),
+    supabase.from("projet_partenaire").select("partenaire_id").eq("projet_id", projetId),
+  ]);
+
+  const ids = new Set<string>();
+  if (projet?.id_partenaire_createur) ids.add(projet.id_partenaire_createur);
+  membres?.forEach((m) => ids.add(m.user_id));
+  partenaires?.forEach((p) => ids.add(p.partenaire_id));
+  ids.delete(excludeUserId);
+
+  if (!ids.size) return;
+
+  await supabase.from("notifications").insert(
+    Array.from(ids).map((user_id) => ({
+      user_id,
+      type,
+      titre,
+      lien: `/projets/${projetId}`,
+    }))
+  );
+}
+
+// ------------------------------------------------------------------
+// Messagerie de projet : fil d'échange collectif rattaché à la fiche projet. Passe par la RLS
+// messages_projet_insert (admin/partenaire, ou membre du projet via is_project_member()) —
+// donc accessible à toute l'équipe, pas seulement au référent.
+// ------------------------------------------------------------------
+export async function createMessageProjet(projetId: string, contenu: string): Promise<void> {
+  const texte = contenu.trim();
+  if (!texte) return;
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase.from("messages_projet").insert({
+    projet_id: projetId,
+    auteur_id: user.id,
+    contenu: texte,
+  });
+  if (error) return;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nom, prenom")
+    .eq("id", user.id)
+    .maybeSingle();
+  const auteur = profile ? `${profile.prenom} ${profile.nom}` : "Un membre du projet";
+
+  await notifyProjectTeam(supabase, projetId, user.id, "message_projet", `${auteur} a écrit dans le fil du projet`);
+  revalidatePath(`/projets/${projetId}`);
+}
+
+// ------------------------------------------------------------------
+// Marquage des notifications comme lues (RLS notifications_update : user_id = auth.uid()).
+// ------------------------------------------------------------------
+export async function markNotificationRead(id: string): Promise<void> {
+  const supabase = await createServerClient();
+  await supabase.from("notifications").update({ lu: true }).eq("id", id);
+  revalidatePath("/notifications");
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("notifications").update({ lu: true }).eq("user_id", user.id).eq("lu", false);
+  revalidatePath("/notifications");
 }
 
 // ------------------------------------------------------------------
