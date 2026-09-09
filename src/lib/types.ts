@@ -10,6 +10,7 @@ export interface Profile {
   email: string;
   role: UserRole;
   organisation: string | null;
+  photo_url: string | null;
   created_at: string;
 }
 
@@ -23,6 +24,9 @@ export interface Invitation {
   date_expiration: string;
   id_emetteur: string;
   projet_id: string | null;
+  nom: string | null;
+  prenom: string | null;
+  organisation: string | null;
 }
 
 export interface Projet {
@@ -32,6 +36,7 @@ export interface Projet {
   etat: ProjetEtat;
   date_creation: string;
   id_partenaire_createur: string;
+  logo_url: string | null;
 }
 
 export interface MembreProjet {
@@ -39,7 +44,7 @@ export interface MembreProjet {
   projet_id: string;
   user_id: string;
   date_ajout: string;
-  profile?: Pick<Profile, "nom" | "prenom" | "email" | "organisation"> | null;
+  profile?: Pick<Profile, "nom" | "prenom" | "email" | "organisation" | "photo_url"> | null;
 }
 
 export type EtapeStatut = "a_faire" | "en_cours" | "validee" | "refusee";
@@ -62,16 +67,52 @@ export const ETAPE_STATUT_LABELS: Record<EtapeStatut, string> = {
   refusee: "Refusée",
 };
 
+export const ETAPE_STATUT_COLORS: Record<EtapeStatut, string> = {
+  a_faire: "var(--color-muted)",
+  en_cours: "var(--color-primary-2)",
+  validee: "var(--color-success)",
+  refusee: "var(--color-accent)",
+};
+
 export interface MessageProjet {
   id: string;
   projet_id: string;
+  etape_id: string | null;
   auteur_id: string;
   contenu: string;
   created_at: string;
-  auteur?: Pick<Profile, "nom" | "prenom" | "role"> | null;
+  auteur?: Pick<Profile, "nom" | "prenom" | "role" | "photo_url"> | null;
 }
 
-export type NotificationType = "etape_ajoutee" | "etape_statut" | "message_projet" | "invitation_acceptee";
+export interface DocumentProjet {
+  id: string;
+  projet_id: string;
+  etape_id: string | null;
+  type: string | null;
+  nom_fichier: string;
+  lien_fichier: string;
+  date_upload: string;
+  uploaded_by: string;
+  uploader?: Pick<Profile, "nom" | "prenom"> | null;
+}
+
+export interface DirectMessage {
+  id: string;
+  expediteur_id: string;
+  destinataire_id: string;
+  contenu: string;
+  date_envoi: string;
+  lu: boolean;
+}
+
+export type NotificationType =
+  | "etape_ajoutee"
+  | "etape_statut"
+  | "message_projet"
+  | "message_etape"
+  | "document_ajoute"
+  | "invitation_acceptee"
+  | "message_direct";
 
 export interface AppNotification {
   id: string;
@@ -95,4 +136,12 @@ export const ETAT_LABELS: Record<ProjetEtat, string> = {
   valide: "Validé",
   en_cours: "En cours",
   archive: "Archivé",
+};
+
+export const ETAT_COLORS: Record<ProjetEtat, string> = {
+  brouillon: "var(--color-muted)",
+  soumis: "var(--color-primary-2)",
+  valide: "var(--color-success)",
+  en_cours: "var(--color-primary)",
+  archive: "#8a8f98",
 };

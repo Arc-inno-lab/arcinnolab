@@ -46,6 +46,9 @@ export async function createInvitation(_prev: ActionResult, formData: FormData):
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const roleCible = String(formData.get("role_cible") || "") as InvitationRoleCible;
   const projetId = String(formData.get("projet_id") || "").trim();
+  const nom = String(formData.get("nom") || "").trim();
+  const prenom = String(formData.get("prenom") || "").trim();
+  const organisation = String(formData.get("organisation") || "").trim();
 
   if (!email || !["partenaire", "porteur"].includes(roleCible)) {
     return { error: "Email et rôle cible requis." };
@@ -62,6 +65,9 @@ export async function createInvitation(_prev: ActionResult, formData: FormData):
       role_cible: roleCible,
       id_emetteur: user.id,
       projet_id: projetId || null,
+      nom: nom || null,
+      prenom: prenom || null,
+      organisation: organisation || null,
     })
     .select("token")
     .single();
@@ -264,6 +270,163 @@ export async function markAllNotificationsRead(): Promise<void> {
   if (!user) return;
   await supabase.from("notifications").update({ lu: true }).eq("user_id", user.id).eq("lu", false);
   revalidatePath("/notifications");
+}
+
+// ------------------------------------------------------------------
+// Upload vers le bucket de stockage unique "arcinnolab-media" (logos de projet, avatars, pièces
+// jointes). Lecture publique, écriture réservée aux utilisateurs authentifiés (cf. migration 006).
+// ------------------------------------------------------------------
+async function uploadToMedia(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  file: File,
+  folder: string
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("arcinnolab-media")
+    .upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (error) return null;
+  const { data } = supabase.storage.from("arcinnolab-media").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ------------------------------------------------------------------
+// Photo de profil (avatar) — visible dans l'équipe projet, l'annuaire et la messagerie directe.
+// ------------------------------------------------------------------
+export async function updateProfilePhoto(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const file = formData.get("photo") as File | null;
+  if (!file || file.size === 0) return { error: "Choisissez une image." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const url = await uploadToMedia(supabase, file, `avatars/${user.id}`);
+  if (!url) return { error: "Échec de l'envoi de l'image." };
+
+  const { error } = await supabase.from("profiles").update({ photo_url: url }).eq("id", user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+
+// ------------------------------------------------------------------
+// Logo d'un projet — réservé au référent (ou admin), passe par la RLS projets_update.
+// ------------------------------------------------------------------
+export async function updateProjetLogo(projetId: string, formData: FormData): Promise<void> {
+  const file = formData.get("logo") as File | null;
+  if (!file || file.size === 0) return;
+
+  const supabase = await createServerClient();
+  const url = await uploadToMedia(supabase, file, `logos-projet/${projetId}`);
+  if (!url) return;
+
+  await supabase.from("projets").update({ logo_url: url }).eq("id", projetId);
+  revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/projets");
+}
+
+// ------------------------------------------------------------------
+// Sous-fil de discussion et pièces jointes rattachés à une étape précise du passeport projet
+// (mêmes droits que la messagerie de projet : toute l'équipe, pas seulement le référent).
+// ------------------------------------------------------------------
+export async function createEtapeMessage(projetId: string, etapeId: string, contenu: string): Promise<void> {
+  const texte = contenu.trim();
+  if (!texte) return;
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from("messages_projet")
+    .insert({ projet_id: projetId, etape_id: etapeId, auteur_id: user.id, contenu: texte });
+  if (error) return;
+
+  const { data: etape } = await supabase.from("etapes_projet").select("titre").eq("id", etapeId).maybeSingle();
+  await notifyProjectTeam(
+    supabase,
+    projetId,
+    user.id,
+    "message_etape",
+    `Nouveau message sur l'étape « ${etape?.titre ?? ""} »`
+  );
+  revalidatePath(`/projets/${projetId}/etapes/${etapeId}`);
+}
+
+export async function addEtapeDocument(projetId: string, etapeId: string, formData: FormData): Promise<void> {
+  const file = formData.get("fichier") as File | null;
+  if (!file || file.size === 0) return;
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const url = await uploadToMedia(supabase, file, `documents/${projetId}`);
+  if (!url) return;
+
+  await supabase.from("documents").insert({
+    projet_id: projetId,
+    etape_id: etapeId,
+    type: file.type || "fichier",
+    nom_fichier: file.name,
+    lien_fichier: url,
+    uploaded_by: user.id,
+  });
+
+  const { data: etape } = await supabase.from("etapes_projet").select("titre").eq("id", etapeId).maybeSingle();
+  await notifyProjectTeam(
+    supabase,
+    projetId,
+    user.id,
+    "document_ajoute",
+    `Nouveau fichier sur l'étape « ${etape?.titre ?? ""} »`
+  );
+  revalidatePath(`/projets/${projetId}/etapes/${etapeId}`);
+}
+
+// ------------------------------------------------------------------
+// Messagerie directe 1:1 (table "messages" du schéma initial, RLS déjà en place : chacun ne voit
+// que ses propres conversations, l'admin voit tout).
+// ------------------------------------------------------------------
+export async function sendDirectMessage(destinataireId: string, contenu: string): Promise<void> {
+  const texte = contenu.trim();
+  if (!texte || !destinataireId) return;
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || user.id === destinataireId) return;
+
+  const { error } = await supabase
+    .from("messages")
+    .insert({ expediteur_id: user.id, destinataire_id: destinataireId, contenu: texte });
+  if (error) return;
+
+  await supabase.from("notifications").insert({
+    user_id: destinataireId,
+    type: "message_direct",
+    titre: "Nouveau message",
+    lien: `/messages/${user.id}`,
+  });
+
+  revalidatePath(`/messages/${destinataireId}`);
+  revalidatePath("/messages");
+}
+
+export async function markConversationRead(otherUserId: string): Promise<void> {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from("messages")
+    .update({ lu: true })
+    .eq("destinataire_id", user.id)
+    .eq("expediteur_id", otherUserId)
+    .eq("lu", false);
+  revalidatePath("/messages");
 }
 
 // ------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { updateProjetEtat } from "@/app/actions";
-import { ETAT_LABELS, type ProjetEtat } from "@/lib/types";
+import { ETAT_LABELS, ETAT_COLORS, type ProjetEtat } from "@/lib/types";
 
 const ETATS: ProjetEtat[] = ["brouillon", "soumis", "valide", "en_cours", "archive"];
 
@@ -10,21 +10,20 @@ export function EtatSelect({ projetId, etat }: { projetId: string; etat: ProjetE
   const [pending, startTransition] = useTransition();
 
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span style={{ color: "var(--color-muted)" }}>État :</span>
-      <select
-        defaultValue={etat}
-        disabled={pending}
-        onChange={(e) => startTransition(() => updateProjetEtat(projetId, e.target.value))}
-        className="rounded-md border px-2 py-1"
-        style={{ borderColor: "var(--color-border)" }}
-      >
-        {ETATS.map((e) => (
-          <option key={e} value={e}>
-            {ETAT_LABELS[e]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="pill-group" role="group" aria-label="État du projet">
+      {ETATS.map((e) => (
+        <button
+          key={e}
+          type="button"
+          disabled={pending || e === etat}
+          aria-pressed={e === etat}
+          onClick={() => startTransition(() => updateProjetEtat(projetId, e))}
+          className="pill"
+          style={{ "--pill-color": ETAT_COLORS[e] } as React.CSSProperties}
+        >
+          {ETAT_LABELS[e]}
+        </button>
+      ))}
+    </div>
   );
 }
