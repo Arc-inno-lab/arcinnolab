@@ -39,10 +39,13 @@ export async function bootstrapAdmin(_prev: ActionResult, formData: FormData): P
 
 // ------------------------------------------------------------------
 // Création d'une invitation nominative (Partenaire par l'Admin, ou Porteur par un Partenaire/Admin).
+// Si projet_id est fourni (invitation d'un porteur depuis une fiche projet), accept_invitation()
+// ajoutera automatiquement la personne à membres_projet au moment où elle acceptera.
 // ------------------------------------------------------------------
 export async function createInvitation(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const roleCible = String(formData.get("role_cible") || "") as InvitationRoleCible;
+  const projetId = String(formData.get("projet_id") || "").trim();
 
   if (!email || !["partenaire", "porteur"].includes(roleCible)) {
     return { error: "Email et rôle cible requis." };
@@ -54,7 +57,12 @@ export async function createInvitation(_prev: ActionResult, formData: FormData):
 
   const { data, error } = await supabase
     .from("invitations")
-    .insert({ email, role_cible: roleCible, id_emetteur: user.id })
+    .insert({
+      email,
+      role_cible: roleCible,
+      id_emetteur: user.id,
+      projet_id: projetId || null,
+    })
     .select("token")
     .single();
 
@@ -67,7 +75,54 @@ export async function createInvitation(_prev: ActionResult, formData: FormData):
 
   revalidatePath("/admin");
   revalidatePath("/invitations");
+  if (projetId) revalidatePath(`/projets/${projetId}`);
   return { success: true, inviteUrl: `${APP_URL}/invite/${data.token}` };
+}
+
+// ------------------------------------------------------------------
+// Création d'une fiche projet par un Partenaire (ou l'Admin), qui en devient le référent.
+// Pas de workflow de validation en V0 (§10 du master prompt) : le projet est actif directement.
+// ------------------------------------------------------------------
+export async function createProjet(_prev: ActionResult, formData: FormData): Promise<ActionResult & { projetId?: string }> {
+  const titre = String(formData.get("titre") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+
+  if (!titre) {
+    return { error: "Le titre du projet est requis." };
+  }
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { data, error } = await supabase
+    .from("projets")
+    .insert({
+      titre,
+      description: description || null,
+      etat: "en_cours",
+      id_partenaire_createur: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { error: "Impossible de créer le projet (droits insuffisants ou " + error.message + ")." };
+  }
+
+  revalidatePath("/projets");
+  redirect(`/projets/${data.id}`);
+}
+
+// ------------------------------------------------------------------
+// Changement d'état d'un projet par son référent (ou l'admin). Passe par la RLS normale
+// (projets_update : admin, ou référent via is_project_referent()).
+// ------------------------------------------------------------------
+export async function updateProjetEtat(projetId: string, etat: string): Promise<void> {
+  const supabase = await createServerClient();
+  await supabase.from("projets").update({ etat }).eq("id", projetId);
+  revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/projets");
 }
 
 // ------------------------------------------------------------------

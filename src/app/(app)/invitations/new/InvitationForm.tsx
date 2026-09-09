@@ -4,7 +4,14 @@ import { useActionState, useState } from "react";
 import { createInvitation } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
 
-export function InvitationForm({ canInvitePartenaire }: { canInvitePartenaire: boolean }) {
+export function InvitationForm({
+  canInvitePartenaire,
+  projetId,
+}: {
+  canInvitePartenaire: boolean;
+  /** Invitation lancée depuis une fiche projet : force le rôle Porteur et lie l'invitation au projet. */
+  projetId?: string;
+}) {
   const [state, formAction, pending] = useActionState(createInvitation, {});
   const [copied, setCopied] = useState(false);
 
@@ -25,6 +32,8 @@ export function InvitationForm({ canInvitePartenaire }: { canInvitePartenaire: b
       style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
     >
       <form action={formAction} noValidate>
+        {projetId && <input type="hidden" name="projet_id" value={projetId} />}
+
         <label htmlFor="email" className="mb-1 block text-sm font-medium">
           Adresse email de la personne invitée
         </label>
@@ -37,21 +46,25 @@ export function InvitationForm({ canInvitePartenaire }: { canInvitePartenaire: b
           style={{ borderColor: "var(--color-border)" }}
         />
 
-        <fieldset className="mt-4">
-          <legend className="mb-1 block text-sm font-medium">Rôle attribué</legend>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" name="role_cible" value="porteur" defaultChecked />
-              Porteur de projet
-            </label>
-            {canInvitePartenaire && (
+        {projetId ? (
+          <input type="hidden" name="role_cible" value="porteur" />
+        ) : (
+          <fieldset className="mt-4">
+            <legend className="mb-1 block text-sm font-medium">Rôle attribué</legend>
+            <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm">
-                <input type="radio" name="role_cible" value="partenaire" />
-                Partenaire ArcInnoLab
+                <input type="radio" name="role_cible" value="porteur" defaultChecked />
+                Porteur de projet
               </label>
-            )}
-          </div>
-        </fieldset>
+              {canInvitePartenaire && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="role_cible" value="partenaire" />
+                  Partenaire ArcInnoLab
+                </label>
+              )}
+            </div>
+          </fieldset>
+        )}
 
         <FieldError message={state.error} />
 

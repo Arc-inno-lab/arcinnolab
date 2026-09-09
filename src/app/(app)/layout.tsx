@@ -32,6 +32,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span style={{ color: "var(--color-muted)" }}>
               {profile.prenom} {profile.nom} · <strong>{ROLE_LABELS[profile.role]}</strong>
             </span>
+            <Link href="/projets" className="font-medium underline">
+              Projets
+            </Link>
             {(profile.role === "admin" || profile.role === "partenaire") && (
               <Link href="/invitations/new" className="font-medium underline">
                 Inviter

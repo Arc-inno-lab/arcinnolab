@@ -25,8 +25,33 @@ export interface Invitation {
   projet_id: string | null;
 }
 
+export interface Projet {
+  id: string;
+  titre: string;
+  description: string | null;
+  etat: ProjetEtat;
+  date_creation: string;
+  id_partenaire_createur: string;
+}
+
+export interface MembreProjet {
+  id: string;
+  projet_id: string;
+  user_id: string;
+  date_ajout: string;
+  profile?: Pick<Profile, "nom" | "prenom" | "email" | "organisation"> | null;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrateur",
   partenaire: "Partenaire ArcInnoLab",
   porteur: "Porteur de projet",
+};
+
+export const ETAT_LABELS: Record<ProjetEtat, string> = {
+  brouillon: "Brouillon",
+  soumis: "Soumis",
+  valide: "Validé",
+  en_cours: "En cours",
+  archive: "Archivé",
 };

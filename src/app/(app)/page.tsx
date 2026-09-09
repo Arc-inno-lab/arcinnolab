@@ -16,8 +16,8 @@ export default async function DashboardPage() {
     <div>
       <h1 className="mb-2 text-2xl font-semibold">Bonjour {profile.prenom} 👋</h1>
       <p className="mb-6" style={{ color: "var(--color-muted)" }}>
-        Voici le socle ArcInnoLab (comptes, rôles, invitations). Les fiches projet, RDV, étapes et
-        messagerie arrivent dans les prochaines briques, une fois ce socle validé.
+        Comptes, rôles, invitations et fiches projet sont en place. RDV, étapes et messagerie
+        arrivent dans les prochaines briques.
       </p>
 
       {profile.role === "admin" && (
@@ -25,7 +25,8 @@ export default async function DashboardPage() {
           <h2 className="mb-2 text-lg font-medium">Administrateur</h2>
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
             Gérez les comptes et les invitations depuis le{" "}
-            <a href="/admin" className="font-medium underline">back-office</a>.
+            <a href="/admin" className="font-medium underline">back-office</a>, ou consultez tous
+            les <a href="/projets" className="font-medium underline">projets</a>.
           </p>
         </div>
       )}
@@ -34,8 +35,9 @@ export default async function DashboardPage() {
         <div className="rounded-lg border p-5" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
           <h2 className="mb-2 text-lg font-medium">Partenaire ArcInnoLab</h2>
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Vous pouvez <a href="/invitations/new" className="font-medium underline">inviter un porteur de projet</a>.
-            La création de fiche projet arrive dans la brique suivante.
+            <a href="/projets/nouveau" className="font-medium underline">Créez une fiche projet</a>{" "}
+            puis invitez-y un porteur, ou consultez vos{" "}
+            <a href="/projets" className="font-medium underline">projets</a>.
           </p>
         </div>
       )}
@@ -44,8 +46,7 @@ export default async function DashboardPage() {
         <div className="rounded-lg border p-5" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
           <h2 className="mb-2 text-lg font-medium">Votre espace porteur de projet</h2>
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Aucun projet pour le moment. Votre référent ArcInnoLab créera votre fiche projet
-            prochainement.
+            Retrouvez <a href="/projets" className="font-medium underline">vos projets</a> ici.
           </p>
         </div>
       )}
