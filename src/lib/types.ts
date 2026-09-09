@@ -42,6 +42,26 @@ export interface MembreProjet {
   profile?: Pick<Profile, "nom" | "prenom" | "email" | "organisation"> | null;
 }
 
+export type EtapeStatut = "a_faire" | "en_cours" | "validee" | "refusee";
+
+export interface EtapeProjet {
+  id: string;
+  projet_id: string;
+  titre: string;
+  statut: EtapeStatut;
+  ordre: number;
+  avis: string | null;
+  id_partenaire_validateur: string | null;
+  date_validation: string | null;
+}
+
+export const ETAPE_STATUT_LABELS: Record<EtapeStatut, string> = {
+  a_faire: "À faire",
+  en_cours: "En cours",
+  validee: "Validée",
+  refusee: "Refusée",
+};
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrateur",
   partenaire: "Partenaire ArcInnoLab",

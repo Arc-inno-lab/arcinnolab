@@ -22,14 +22,10 @@ export default async function ProjetsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Projets</h1>
+      <div className="mb-6">
+        <h1 className="mb-3 text-2xl font-semibold">Projets</h1>
         {canCreate && (
-          <Link
-            href="/projets/nouveau"
-            className="rounded-md px-4 py-2 text-sm font-medium text-white"
-            style={{ background: "var(--color-primary)" }}
-          >
+          <Link href="/projets/nouveau" className="btn btn-primary">
             + Nouveau projet
           </Link>
         )}

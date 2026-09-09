@@ -126,6 +126,49 @@ export async function updateProjetEtat(projetId: string, etat: string): Promise<
 }
 
 // ------------------------------------------------------------------
+// Étapes du "passeport projet" : ajout par le référent (ou l'admin), passe par la RLS
+// etapes_projet_write (admin ou is_project_referent()).
+// ------------------------------------------------------------------
+export async function createEtape(projetId: string, titre: string): Promise<void> {
+  if (!titre.trim()) return;
+  const supabase = await createServerClient();
+  const { count } = await supabase
+    .from("etapes_projet")
+    .select("id", { count: "exact", head: true })
+    .eq("projet_id", projetId);
+  await supabase.from("etapes_projet").insert({
+    projet_id: projetId,
+    titre: titre.trim(),
+    ordre: count ?? 0,
+  });
+  revalidatePath(`/projets/${projetId}`);
+}
+
+// ------------------------------------------------------------------
+// Validation/refus d'une étape par le référent (ou l'admin) — avis facultatif.
+// ------------------------------------------------------------------
+export async function updateEtapeStatut(
+  projetId: string,
+  etapeId: string,
+  statut: string,
+  avis?: string
+): Promise<void> {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTerminal = statut === "validee" || statut === "refusee";
+  await supabase
+    .from("etapes_projet")
+    .update({
+      statut,
+      avis: avis?.trim() || null,
+      id_partenaire_validateur: isTerminal ? user?.id ?? null : null,
+      date_validation: isTerminal ? new Date().toISOString() : null,
+    })
+    .eq("id", etapeId);
+  revalidatePath(`/projets/${projetId}`);
+}
+
+// ------------------------------------------------------------------
 // Annulation d'une invitation en attente.
 // ------------------------------------------------------------------
 export async function cancelInvitation(invitationId: string): Promise<void> {

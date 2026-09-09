@@ -37,12 +37,7 @@ export function ProjetForm() {
 
         <FieldError message={state.error} />
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-5 w-full rounded-md px-4 py-2 font-medium text-white disabled:opacity-60"
-          style={{ background: "var(--color-primary)" }}
-        >
+        <button type="submit" disabled={pending} className="btn btn-primary mt-5 w-full">
           {pending ? "Création..." : "Créer le projet"}
         </button>
       </form>

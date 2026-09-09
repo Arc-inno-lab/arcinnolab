@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, Projet, MembreProjet } from "@/lib/types";
+import type { Profile, Projet, MembreProjet, EtapeProjet } from "@/lib/types";
 import { ETAT_LABELS } from "@/lib/types";
 import { InvitationForm } from "../../invitations/new/InvitationForm";
 import { EtatSelect } from "./EtatSelect";
+import { EtapesSection } from "./EtapesSection";
 
 type ProjetAvecReferent = Projet & {
   referent: Pick<Profile, "nom" | "prenom" | "email"> | null;
@@ -33,6 +34,13 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     .select("*, profile:profiles(nom,prenom,email,organisation)")
     .eq("projet_id", id)
     .returns<MembreProjet[]>();
+
+  const { data: etapes } = await supabase
+    .from("etapes_projet")
+    .select("*")
+    .eq("projet_id", id)
+    .order("ordre", { ascending: true })
+    .returns<EtapeProjet[]>();
 
   const isReferent = profile?.id === projet.id_partenaire_createur;
   const isAdmin = profile?.role === "admin";
@@ -98,6 +106,8 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
           </ul>
         )}
       </section>
+
+      <EtapesSection projetId={projet.id} etapes={etapes ?? []} peutGerer={peutGerer} />
 
       {peutGerer && (
         <section aria-labelledby="inviter-heading">

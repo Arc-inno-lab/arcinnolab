@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/actions";
 import { Logo } from "@/components/Logo";
+import { SidebarNav, type NavItem } from "@/components/SidebarNav";
 import { ROLE_LABELS, type Profile } from "@/lib/types";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,42 +19,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile) redirect("/login");
 
+  const items: NavItem[] = [{ href: "/", label: "Accueil" }, { href: "/projets", label: "Projets" }];
+  if (profile.role === "admin" || profile.role === "partenaire") {
+    items.push({ href: "/invitations/new", label: "Inviter" });
+  }
+  if (profile.role === "admin") {
+    items.push({ href: "/admin", label: "Back-office" });
+  }
+
   return (
-    <div className="min-h-screen">
-      <header
-        className="border-b"
+    <div className="md:flex md:min-h-screen">
+      <aside
+        className="border-b md:flex md:min-h-screen md:w-56 md:shrink-0 md:flex-col md:border-b-0 md:border-r"
         style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
       >
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 md:flex-col md:items-start md:gap-1">
           <Link href="/" className="flex items-center gap-2">
             <Logo />
           </Link>
-          <nav aria-label="Navigation principale" className="flex flex-wrap items-center gap-4 text-sm">
-            <span style={{ color: "var(--color-muted)" }}>
-              {profile.prenom} {profile.nom} · <strong>{ROLE_LABELS[profile.role]}</strong>
-            </span>
-            <Link href="/projets" className="font-medium underline">
-              Projets
-            </Link>
-            {(profile.role === "admin" || profile.role === "partenaire") && (
-              <Link href="/invitations/new" className="font-medium underline">
-                Inviter
-              </Link>
-            )}
-            {profile.role === "admin" && (
-              <Link href="/admin" className="font-medium underline">
-                Back-office
-              </Link>
-            )}
-            <form action={logout}>
-              <button type="submit" className="font-medium underline">
-                Déconnexion
-              </button>
-            </form>
-          </nav>
+          <span className="text-xs md:mt-1" style={{ color: "var(--color-muted)" }}>
+            {profile.prenom} {profile.nom} · <strong>{ROLE_LABELS[profile.role]}</strong>
+          </span>
         </div>
-      </header>
-      <main id="main" className="mx-auto max-w-4xl px-4 py-8">
+
+        <SidebarNav items={items} />
+
+        <div className="px-4 py-3 md:mt-auto md:px-3">
+          <form action={logout}>
+            <button type="submit" className="btn btn-outline w-full md:w-auto">
+              Déconnexion
+            </button>
+          </form>
+        </div>
+      </aside>
+      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
         {children}
       </main>
     </div>

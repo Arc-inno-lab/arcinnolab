@@ -34,7 +34,6 @@ a {
 }
 
 /* Cible tactile et focus visibles pour tous les éléments interactifs (WCAG 2.1 AA) */
-a,
 button,
 input,
 select,
@@ -45,6 +44,61 @@ textarea {
 :focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* Boutons — un seul style de référence pour tout le site (évite le texte mal centré sur les
+   liens habillés en bouton : un <a> reste "inline" par défaut, min-height seul ne suffit pas). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-outline:hover {
+  background: var(--color-bg);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  min-height: 36px;
+  padding: 0.375rem 0.75rem;
+}
+
+.btn-danger:hover {
+  background: var(--color-danger);
+  color: #fff;
 }
 
 .skip-link {
