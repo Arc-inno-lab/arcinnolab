@@ -1,18 +1,15 @@
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { BootstrapForm } from "./BootstrapForm";
 
 // Dépend de l'état courant de la base (existe-t-il déjà un admin ?) : jamais prérendu statiquement.
 export const dynamic = "force-dynamic";
 
 export default async function BootstrapPage() {
-  const admin = createAdminClient();
-  const { count } = await admin
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "admin");
+  const supabase = await createClient();
+  const { data: exists } = await supabase.rpc("admin_exists");
 
-  if (count && count > 0) {
+  if (exists) {
     redirect("/login");
   }
 

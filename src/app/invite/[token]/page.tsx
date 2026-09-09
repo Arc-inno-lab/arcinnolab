@@ -1,18 +1,17 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { AcceptInvitationForm } from "./AcceptInvitationForm";
-import { ROLE_LABELS, type Invitation } from "@/lib/types";
+import { ROLE_LABELS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const admin = createAdminClient();
+  const supabase = await createClient();
 
-  const { data: invitation } = await admin
-    .from("invitations")
-    .select("*")
-    .eq("token", token)
-    .single<Invitation>();
+  const { data: rows } = await supabase.rpc("get_invitation_preview", { p_token: token });
+  const invitation = rows?.[0] as
+    | { email: string; role_cible: "partenaire" | "porteur"; statut: string; date_expiration: string }
+    | undefined;
 
   const now = new Date();
   const expired = invitation && new Date(invitation.date_expiration) < now;
