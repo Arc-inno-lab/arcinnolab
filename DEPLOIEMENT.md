@@ -35,9 +35,20 @@ conception — il n'y a aucun secret sensible à configurer côté hébergement.
 
 ## Déployer
 
-Le dépôt GitHub est relié à Vercel : **tout `push` sur `main` déclenche un
-déploiement en production**. C'est la voie normale, il n'y a rien à lancer à la
-main.
+**Tout `push` sur `main` déclenche un déploiement en production**, via
+`.github/workflows/deploy.yml`. C'est la voie normale, il n'y a rien à lancer à
+la main.
+
+Ce workflow appelle la CLI Vercel au lieu de l'intégration Git native, et ce
+n'est pas un caprice : **le plan Vercel gratuit refuse de déployer depuis un
+dépôt appartenant à une organisation GitHub**. Le code vit dans l'organisation
+`Arc.inno.lab` — c'est ce qui permet d'inviter les partenaires nominativement —
+donc l'intégration native est inutilisable tant que Vercel reste en Hobby. La
+CLI, elle, ne fait pas cette distinction.
+
+Le workflow ne s'arrête pas au déploiement : il vérifie ensuite par requête
+réelle que `/login`, `/a-propos` et `/projets` répondent correctement, et échoue
+si ce n'est pas le cas.
 
 ### Repli : déploiement depuis un poste
 
