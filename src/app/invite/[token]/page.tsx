@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { InterregFooter } from "@/components/InterregFooter";
+import { InterregMention } from "@/components/InterregFooter";
 import { AcceptInvitationForm } from "./AcceptInvitationForm";
 import { ROLE_LABELS } from "@/lib/types";
 
@@ -48,8 +48,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           )}
         </div>
       </div>
-      <div className="w-full max-w-3xl">
-        <InterregFooter />
+      <div className="w-full max-w-sm">
+        <InterregMention />
       </div>
     </main>
   );

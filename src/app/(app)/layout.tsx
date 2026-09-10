@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
-import { InterregFooter } from "@/components/InterregFooter";
+import { InterregMention } from "@/components/InterregFooter";
 import { Logo } from "@/components/Logo";
 import { SidebarNav, type NavItem } from "@/components/SidebarNav";
 import { ROLE_LABELS, type Profile } from "@/lib/types";
@@ -83,7 +83,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">
         <div className="flex-1">{children}</div>
-        <InterregFooter />
+        <InterregMention />
       </main>
     </div>
   );

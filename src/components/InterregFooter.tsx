@@ -1,39 +1,46 @@
 import Link from "next/link";
 
 /**
- * Bandeau de conformité Interreg France-Suisse 2021-2027.
+ * Conformité Interreg France-Suisse 2021-2027 — deux niveaux volontairement distincts.
  *
- * Obligations couvertes (Guide de communication Interreg FR-CH 21-27, p. 2 et 5) :
- *  - le logo du programme figure sur TOUS les supports d'information du projet,
- *    internes et externes (p. 2) — donc sur chaque page de la plateforme ;
- *  - lien vers interreg-francesuisse.eu (p. 5) ;
- *  - nom du projet (p. 5) ;
- *  - mise en évidence du soutien financier (p. 5) ;
- *  - logos des autres co-financeurs (p. 5).
+ * Décision produit (César, 10/09) : l'application est un outil opérationnel, pas un
+ * support de communication. Le pavé complet encombrait chaque écran pour rien.
  *
- * Règles de tracé respectées :
- *  - logo couleur sur fond blanc, y compris au-dessus d'un fond sombre → le logo
- *    est toujours posé dans un rectangle blanc (p. 3) ;
- *  - aucune déformation : seule la hauteur est contrainte en CSS, la largeur suit (p. 3) ;
- *  - aucun filtre, aucune opacité, aucune désaturation appliquée au logo (p. 3) ;
- *  - l'emblème européen reste au moins aussi haut que le plus grand des autres
- *    logos affichés à côté (p. 4) — d'où la hauteur 72px du bloc programme face
- *    aux 22px des co-financeurs ;
- *  - alignement par le milieu et espacement généreux entre les blocs (p. 4).
+ * Compromis retenu :
+ *  - `InterregMention` : un rappel d'une seule ligne sur les écrans de travail. Le guide
+ *    (p. 2) exige le logo sur « tous les supports d'information et de communication […]
+ *    internes et externes » — le retirer complètement des écrans internes serait un pari.
+ *    Le logo y est seul, donc la règle de hauteur relative (p. 4) ne s'applique pas :
+ *    elle ne vaut que « si le logo du programme est positionné à côté d'autres logos ».
+ *  - `InterregBlock` : le bloc complet exigé pour un site internet (p. 5) — logos du
+ *    programme et des co-financeurs, lien vers interreg-francesuisse.eu, nom du projet,
+ *    description avec objectif, résultats attendus et soutien financier. Porté par la
+ *    seule page /a-propos, publique et donc capturable comme preuve de publicité (p. 8).
+ *
+ * Dans les deux cas : logo couleur sur fond blanc (p. 3), jamais filtré ni désaturé,
+ * jamais déformé — seule la hauteur est contrainte en CSS, la largeur suit.
  */
-export function InterregFooter({ onDark = false }: { onDark?: boolean }) {
+
+const LOGO_ALT = "Interreg France – Suisse 2021-2027 — Cofinancé par l'Union Européenne";
+
+export function InterregMention({ onDark = false }: { onDark?: boolean }) {
   return (
-    <footer
-      className={onDark ? "interreg-band interreg-band--onDark" : "interreg-band"}
-      aria-label="Financement du projet"
-    >
+    <div className={onDark ? "interreg-mention interreg-mention--onDark" : "interreg-mention"}>
+      <span className="interreg-chip">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/financeurs/interreg-france-suisse.png" alt={LOGO_ALT} />
+      </span>
+      <Link href="/a-propos">Projet cofinancé par l&apos;Union européenne</Link>
+    </div>
+  );
+}
+
+export function InterregBlock() {
+  return (
+    <footer className="interreg-band" aria-label="Financement du projet">
       <div className="interreg-logobox">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="interreg-logo"
-          src="/brand/financeurs/interreg-france-suisse.png"
-          alt="Interreg France – Suisse 2021-2027 — Cofinancé par l'Union Européenne"
-        />
+        <img className="interreg-logo" src="/brand/financeurs/interreg-france-suisse.png" alt={LOGO_ALT} />
       </div>
 
       <div className="interreg-copy">
@@ -47,8 +54,6 @@ export function InterregFooter({ onDark = false }: { onDark?: boolean }) {
           <a href="https://www.interreg-francesuisse.eu" target="_blank" rel="noopener noreferrer">
             interreg-francesuisse.eu
           </a>
-          <span aria-hidden="true">·</span>
-          <Link href="/a-propos">À propos du projet</Link>
         </p>
       </div>
 

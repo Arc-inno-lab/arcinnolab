@@ -471,21 +471,74 @@ textarea {
 
 /* ------------------------------------------------------------------ */
 /* Conformité Interreg France-Suisse 2021-2027                         */
-/* Le logo programme n'est JAMAIS filtré, désaturé ni déformé :         */
-/* seule sa hauteur est contrainte, la largeur suit (guide p. 3).       */
+/* Le logo n'est JAMAIS filtré, désaturé ni déformé : seule la hauteur  */
+/* est contrainte, la largeur suit (guide p. 3).                        */
 /* ------------------------------------------------------------------ */
+
+/* Rappel d'une ligne sur les écrans de travail. */
+.interreg-mention {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 2rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.72rem;
+}
+
+.interreg-mention a {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.interreg-mention a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+/* Fond blanc obligatoire sous le logo (guide p. 3), même sur fond sombre. */
+.interreg-chip {
+  background: #fff;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.35rem;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.interreg-chip img {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.interreg-mention--onDark {
+  border-top: 0;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding-top: 0;
+}
+
+.interreg-mention--onDark a {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.interreg-mention--onDark a:hover {
+  color: #fff;
+}
+
+/* Bloc complet, réservé à la page publique /a-propos (guide p. 5). */
 .interreg-band {
   display: flex;
   flex-wrap: wrap;
   align-items: center;     /* alignement par le milieu (guide p. 4) */
   gap: 1.25rem 2.5rem;     /* espace raisonnable entre les blocs (guide p. 4) */
   padding: 1.5rem;
-  margin-top: 3rem;
-  border-top: 1px solid var(--color-border);
+  margin-top: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
-/* Rectangle blanc obligatoire pour poser le logo, y compris sur fond sombre. */
 .interreg-logobox {
   background: #fff;
   border-radius: 0.35rem;
@@ -495,8 +548,8 @@ textarea {
 }
 
 .interreg-logo {
-  height: 72px;            /* l'emblème UE y mesure ~25px, soit > 22px des autres logos */
-  width: auto;             /* jamais d'étirement */
+  height: 72px;            /* l'emblème UE y mesure ~25px, donc > 22px des autres logos */
+  width: auto;
   display: block;
 }
 
@@ -510,29 +563,13 @@ textarea {
 
 .interreg-copy strong { color: var(--color-text); font-weight: 600; }
 
-.interreg-links {
-  margin-top: 0.4rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+.interreg-links { margin-top: 0.4rem; }
 
 .interreg-cofi img {
   height: 22px;            /* < hauteur de l'emblème européen (guide p. 4) */
   width: auto;
   display: block;
 }
-
-/* Sur les écrans publics au fond dégradé, le bandeau reste lisible. */
-.interreg-band--onDark {
-  background: rgba(255, 255, 255, 0.92);
-  border-top: 0;
-  border-radius: var(--radius-md);
-  margin-top: 2rem;
-  color: var(--color-text);
-}
-.interreg-band--onDark .interreg-copy { color: #3d4657; }
-.interreg-band--onDark .interreg-logobox { padding: 0; }
 
 /* Bande des partenaires : plus de filtre, on respecte leurs identités. */
 .partner-strip img { filter: none; opacity: 1; }

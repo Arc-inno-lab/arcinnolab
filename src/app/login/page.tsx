@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "./LoginForm";
-import { InterregFooter } from "@/components/InterregFooter";
+import { InterregMention } from "@/components/InterregFooter";
 
 export default function LoginPage() {
   return (
@@ -20,7 +20,7 @@ export default function LoginPage() {
             <LoginForm />
           </Suspense>
         </div>
-        <InterregFooter onDark />
+        <InterregMention onDark />
       </div>
     </main>
   );

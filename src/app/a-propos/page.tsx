@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Logo } from "@/components/Logo";
-import { InterregFooter } from "@/components/InterregFooter";
+import { InterregBlock } from "@/components/InterregFooter";
 
 export const metadata: Metadata = {
   title: "À propos du projet — INTERLAB / ArcInnoLab",
@@ -130,7 +130,7 @@ export default function AProposPage() {
         </ul>
       </section>
 
-      <InterregFooter />
+      <InterregBlock />
     </main>
   );
 }
