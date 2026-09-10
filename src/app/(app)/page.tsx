@@ -11,7 +11,7 @@ const PARTNER_LOGOS = [
   { src: "/brand/partenaires/technhom.png", alt: "Techn'hom" },
   { src: "/brand/partenaires/ville-delemont.png", alt: "Ville de Delémont" },
   { src: "/brand/partenaires/basel-area.svg", alt: "Basel Area" },
-  { src: "/brand/partenaires/interreg.jpg", alt: "Interreg France-Suisse" },
+  { src: "/brand/partenaires/interreg.png", alt: "Interreg France-Suisse" },
 ];
 
 export default async function DashboardPage() {
