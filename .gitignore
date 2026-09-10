@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...sauf le modèle, qui documente les variables à renseigner.
+!.env.example
+
+# Jeton de déploiement Vercel, à garder hors du dépôt (voir DEPLOIEMENT.md).
+deploy.env
 
 # vercel
 .vercel

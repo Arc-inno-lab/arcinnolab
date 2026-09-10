@@ -1,0 +1,70 @@
+# Maintient le projet Supabase éveillé.
+#
+# POURQUOI : sur le plan Free, Supabase met un projet en pause après 7 jours
+# sans aucune activité. ArcInnoLab a un usage volontairement irrégulier (le
+# comité ne siège qu'une fois par an), donc la mise en pause n'est pas un
+# risque hypothétique : sans ce workflow, elle arrive.
+#
+# CE QUE ÇA FAIT : une requête HTTP anodine vers l'API REST du projet, deux
+# fois par semaine. Ça suffit à réarmer le compteur d'inactivité.
+#
+# LIMITE CONNUE : GitHub désactive automatiquement les workflows planifiés
+# d'un dépôt resté inactif 60 jours. Une tâche de surveillance mensuelle
+# vérifie que ce workflow tourne toujours (voir supabase/README.md).
+#
+# SECRETS À CRÉER (Settings > Secrets and variables > Actions) :
+#   SUPABASE_URL       ex. https://xxxxxxxx.supabase.co
+#   SUPABASE_ANON_KEY  la clé publique "anon" (déjà exposée côté navigateur,
+#                      ce n'est pas un secret sensible)
+
+name: Keep Supabase alive
+
+on:
+  schedule:
+    # Lundi et jeudi à 6h12 UTC. Minute décalée volontairement : les crons
+    # à pile l'heure sont les plus chargés chez GitHub et donc les plus
+    # souvent retardés ou sautés.
+    - cron: "12 6 * * 1,4"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Réveiller la base
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
+            echo "::error::Secrets SUPABASE_URL / SUPABASE_ANON_KEY absents."
+            exit 1
+          fi
+
+          # On interroge une fonction RPC publique et sans effet de bord.
+          # Elle traverse toute la pile (PostgREST puis Postgres), ce qui
+          # garantit que la base elle-même est sollicitée — un simple appel
+          # à la racine de l'API ne réveillerait pas forcément Postgres.
+          code=$(curl --silent --show-error --location \
+            --output /tmp/reponse.json \
+            --write-out "%{http_code}" \
+            --max-time 45 --retry 3 --retry-delay 15 --retry-all-errors \
+            -X POST "${SUPABASE_URL}/rest/v1/rpc/admin_exists" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "HTTP ${code}"
+          echo "Réponse : $(cat /tmp/reponse.json)"
+
+          if [ "${code}" != "200" ]; then
+            echo "::error::La base n'a pas répondu correctement (HTTP ${code})."
+            echo "::error::Vérifier sur supabase.com si le projet a été mis en pause."
+            exit 1
+          fi
+
+          echo "Base éveillée."
