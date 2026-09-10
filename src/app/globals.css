@@ -468,3 +468,71 @@ textarea {
 .fade-up {
   animation: fadeUp 0.35s ease both;
 }
+
+/* ------------------------------------------------------------------ */
+/* Conformité Interreg France-Suisse 2021-2027                         */
+/* Le logo programme n'est JAMAIS filtré, désaturé ni déformé :         */
+/* seule sa hauteur est contrainte, la largeur suit (guide p. 3).       */
+/* ------------------------------------------------------------------ */
+.interreg-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;     /* alignement par le milieu (guide p. 4) */
+  gap: 1.25rem 2.5rem;     /* espace raisonnable entre les blocs (guide p. 4) */
+  padding: 1.5rem;
+  margin-top: 3rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* Rectangle blanc obligatoire pour poser le logo, y compris sur fond sombre. */
+.interreg-logobox {
+  background: #fff;
+  border-radius: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.interreg-logo {
+  height: 72px;            /* l'emblème UE y mesure ~25px, soit > 22px des autres logos */
+  width: auto;             /* jamais d'étirement */
+  display: block;
+}
+
+.interreg-copy {
+  flex: 1 1 22rem;
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.interreg-copy strong { color: var(--color-text); font-weight: 600; }
+
+.interreg-links {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.interreg-cofi img {
+  height: 22px;            /* < hauteur de l'emblème européen (guide p. 4) */
+  width: auto;
+  display: block;
+}
+
+/* Sur les écrans publics au fond dégradé, le bandeau reste lisible. */
+.interreg-band--onDark {
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 0;
+  border-radius: var(--radius-md);
+  margin-top: 2rem;
+  color: var(--color-text);
+}
+.interreg-band--onDark .interreg-copy { color: #3d4657; }
+.interreg-band--onDark .interreg-logobox { padding: 0; }
+
+/* Bande des partenaires : plus de filtre, on respecte leurs identités. */
+.partner-strip img { filter: none; opacity: 1; }

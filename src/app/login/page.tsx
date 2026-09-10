@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "./LoginForm";
+import { InterregFooter } from "@/components/InterregFooter";
 
 export default function LoginPage() {
   return (
@@ -13,10 +14,13 @@ export default function LoginPage() {
         style={{ backgroundImage: "url(/brand/hero.jpg)", backgroundSize: "cover", backgroundPosition: "center", opacity: 0.22, mixBlendMode: "overlay" }}
         aria-hidden="true"
       />
-      <div className="relative fade-up">
-        <Suspense fallback={null}>
-          <LoginForm />
-        </Suspense>
+      <div className="relative fade-up w-full max-w-3xl">
+        <div className="flex justify-center">
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
+        </div>
+        <InterregFooter onDark />
       </div>
     </main>
   );

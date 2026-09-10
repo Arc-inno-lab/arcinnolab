@@ -26,7 +26,9 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const publicPaths = ["/login", "/bootstrap", "/invite"];
+  // "/a-propos" est public : c'est la page projet exigée par le guide de
+  // communication Interreg (p. 5), elle doit être consultable sans compte.
+  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos"];
   const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p));
 
   if (!user && !isPublic) {

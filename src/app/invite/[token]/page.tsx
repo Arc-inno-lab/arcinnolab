@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { InterregFooter } from "@/components/InterregFooter";
 import { AcceptInvitationForm } from "./AcceptInvitationForm";
 import { ROLE_LABELS } from "@/lib/types";
 
@@ -18,7 +19,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const invalid = !invitation || invitation.statut !== "en_attente" || expired;
 
   return (
-    <main id="main" className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 py-10">
       <div className="w-full max-w-sm">
         <div
           className="rounded-lg border p-6"
@@ -46,6 +47,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             </>
           )}
         </div>
+      </div>
+      <div className="w-full max-w-3xl">
+        <InterregFooter />
       </div>
     </main>
   );

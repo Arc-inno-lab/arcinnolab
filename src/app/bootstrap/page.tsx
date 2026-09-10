@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { InterregFooter } from "@/components/InterregFooter";
 import { BootstrapForm } from "./BootstrapForm";
 
 // Dépend de l'état courant de la base (existe-t-il déjà un admin ?) : jamais prérendu statiquement.
@@ -14,7 +15,7 @@ export default async function BootstrapPage() {
   }
 
   return (
-    <main id="main" className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 py-10">
       <div className="w-full max-w-sm">
         <div
           className="rounded-lg border p-6"
@@ -27,6 +28,9 @@ export default async function BootstrapPage() {
           </p>
           <BootstrapForm />
         </div>
+      </div>
+      <div className="w-full max-w-3xl">
+        <InterregFooter />
       </div>
     </main>
   );
