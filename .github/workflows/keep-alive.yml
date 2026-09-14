@@ -12,10 +12,12 @@
 # d'un dépôt resté inactif 60 jours. Une tâche de surveillance mensuelle
 # vérifie que ce workflow tourne toujours (voir supabase/README.md).
 #
-# SECRETS À CRÉER (Settings > Secrets and variables > Actions) :
-#   SUPABASE_URL       ex. https://xxxxxxxx.supabase.co
-#   SUPABASE_ANON_KEY  la clé publique "anon" (déjà exposée côté navigateur,
-#                      ce n'est pas un secret sensible)
+# AUCUN SECRET À CRÉER : les identifiants utilisés ici sont l'adresse du projet
+# et sa clé « anon », publiques par conception — elles partent déjà dans le
+# navigateur de chaque visiteur, et ce sont les policies RLS qui protègent les
+# données. Les inscrire en clair évite de dépendre d'une configuration que
+# personne ne pense à refaire. Des secrets GitHub du même nom, s'ils existent,
+# restent prioritaires.
 
 name: Keep Supabase alive
 
@@ -34,13 +36,13 @@ jobs:
     steps:
       - name: Réveiller la base
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://poewilykmxwpxqvkrrjq.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvZXdpbHlrbXh3cHhxdmtycmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDU1NDcsImV4cCI6MjEwNDYyMTU0N30.LbAyZIGSoMA8UBajxpVsCeEYhDxtRA_0mDirqgAszLI' }}
         run: |
           set -euo pipefail
 
           if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
-            echo "::error::Secrets SUPABASE_URL / SUPABASE_ANON_KEY absents."
+            echo "::error::Adresse ou clé Supabase absente."
             exit 1
           fi
 
