@@ -112,7 +112,11 @@ export type NotificationType =
   | "message_etape"
   | "document_ajoute"
   | "invitation_acceptee"
-  | "message_direct";
+  | "message_direct"
+  // Émise par un trigger à chaque dépôt sur la page publique, pour tous les
+  // admins et partenaires (cf. migration 012). Sans elle, une demande peut
+  // rester invisible jusqu'à ce que quelqu'un pense à ouvrir la file.
+  | "demande_accueil";
 
 export interface AppNotification {
   id: string;

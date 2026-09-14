@@ -26,15 +26,27 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Deux pages sont publiques, pour deux raisons distinctes :
-  //  · "/a-propos" est la page projet exigée par le guide de communication
-  //    Interreg (p. 5), qui doit être consultable sans compte ;
-  //  · "/demande" est la porte d'entrée du guichet. Un guichet unique où il
+  // Pages consultables sans compte, chacune pour une raison précise :
+  //  · "/a-propos" : la page projet exigée par le guide de communication
+  //    Interreg (p. 5), qui doit être accessible à tous ;
+  //  · "/demande" : la porte d'entrée du guichet. Un guichet unique où il
   //    faudrait déjà être invité pour se manifester ne serait pas un guichet.
-  //    Le dépôt n'ouvre aucun compte : la RLS n'autorise là que l'insertion,
-  //    jamais la lecture (cf. migration 010).
-  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos", "/demande"];
-  const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+  //    Le dépôt n'ouvre aucun compte, et la RLS n'autorise là que l'insertion,
+  //    jamais la lecture (cf. migration 010) ;
+  //  · "/suivi" : le porteur y consulte l'état de sa demande avec le lien
+  //    personnel remis au dépôt. La page ne lit rien directement — elle passe
+  //    par une fonction qui ne renvoie que ce qui le concerne, jamais les
+  //    notes internes (cf. migration 012) ;
+  //  · "/login", "/bootstrap", "/invite" : les portes d'authentification.
+  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos", "/demande", "/suivi"];
+
+  // La comparaison est volontairement stricte : chemin identique, ou suivi d'un
+  // « / ». Un simple startsWith laisserait passer "/demandes" — la file de
+  // travail réservée à l'équipe — parce que "/demande" en est un préfixe. Le
+  // piège est invisible à la lecture et n'ouvrirait qu'une seule route, ce qui
+  // le rend d'autant plus facile à manquer.
+  const chemin = request.nextUrl.pathname;
+  const isPublic = publicPaths.some((p) => chemin === p || chemin.startsWith(p + "/"));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

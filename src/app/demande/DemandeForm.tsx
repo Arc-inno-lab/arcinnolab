@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { deposerDemande } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
@@ -8,27 +8,87 @@ import { FieldError } from "@/components/FieldError";
 const champ = "w-full rounded-md border px-3 py-2";
 const bordure = { borderColor: "var(--color-border)" };
 
+/**
+ * Écran de confirmation.
+ *
+ * Il ne se contente pas de dire « c'est enregistré » : il remet au porteur son
+ * lien de suivi. C'est ce qui ferme la boucle — sans lui, la personne repart
+ * sans aucun moyen de savoir où en est sa demande, ce qui contredit la promesse
+ * du manifeste.
+ *
+ * Le lien est affiché en clair et copiable, pas seulement cliquable : il n'y a
+ * pas d'e-mail de confirmation à ce stade, donc ce lien est la seule trace que
+ * le porteur emporte. Il doit pouvoir le coller quelque part.
+ */
+function Confirmation({ suiviUrl }: { suiviUrl?: string }) {
+  const [copie, setCopie] = useState(false);
+
+  async function copier() {
+    if (!suiviUrl) return;
+    try {
+      await navigator.clipboard.writeText(suiviUrl);
+      setCopie(true);
+      setTimeout(() => setCopie(false), 3000);
+    } catch {
+      // Le presse-papiers peut être refusé (navigateur, permissions) : le lien
+      // reste visible et sélectionnable à la main juste au-dessus.
+      setCopie(false);
+    }
+  }
+
+  return (
+    <div className="card p-6" role="status">
+      <h2 className="mb-2 text-lg font-medium">Votre demande est enregistrée</h2>
+      <p className="text-sm">
+        Un membre de l&apos;équipe ArcInnoLab la lit et revient vers vous. Nous
+        nous engageons à vous répondre, même si votre projet ne relève pas de
+        notre périmètre : dans ce cas, nous vous indiquons vers qui vous tourner.
+      </p>
+
+      {suiviUrl && (
+        <div className="mt-5 rounded-md p-4" style={{ background: "var(--color-surface-alt)" }}>
+          <p className="mb-1 text-sm font-medium">Conservez ce lien</p>
+          <p className="mb-3 text-sm" style={{ color: "var(--color-muted)" }}>
+            Il vous permet de suivre l&apos;avancement de votre demande à tout
+            moment, sans créer de compte. C&apos;est le seul moyen d&apos;y
+            accéder : notez-le quelque part.
+          </p>
+
+          <p
+            className="mb-3 overflow-x-auto rounded border p-2 text-xs"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+          >
+            <code>{suiviUrl}</code>
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={copier} className="btn btn-outline">
+              {copie ? "Lien copié" : "Copier le lien"}
+            </button>
+            <a href={suiviUrl} className="btn btn-outline">
+              Ouvrir le suivi
+            </a>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-sm" style={{ color: "var(--color-muted)" }}>
+        Vous n&apos;avez rien d&apos;autre à faire. Inutile de déposer une
+        seconde demande.
+      </p>
+
+      <Link href="/a-propos" className="btn btn-outline mt-5">
+        En savoir plus sur le projet
+      </Link>
+    </div>
+  );
+}
+
 export function DemandeForm() {
   const [state, formAction, pending] = useActionState(deposerDemande, {});
 
   if (state.success) {
-    return (
-      <div className="card p-6" role="status">
-        <h2 className="mb-2 text-lg font-medium">Votre demande est enregistrée</h2>
-        <p className="text-sm">
-          Un membre de l&apos;équipe ArcInnoLab la lit et revient vers vous. Nous
-          nous engageons à vous répondre, même si votre projet ne relève pas de
-          notre périmètre : dans ce cas, nous vous indiquons vers qui vous tourner.
-        </p>
-        <p className="mt-3 text-sm" style={{ color: "var(--color-muted)" }}>
-          Vous n&apos;avez rien d&apos;autre à faire. Inutile de déposer une
-          seconde demande.
-        </p>
-        <Link href="/a-propos" className="btn btn-outline mt-5">
-          En savoir plus sur le projet
-        </Link>
-      </div>
-    );
+    return <Confirmation suiviUrl={state.suiviUrl} />;
   }
 
   return (

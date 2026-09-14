@@ -6,7 +6,13 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { APP_URL } from "@/lib/config";
 import type { InvitationRoleCible } from "@/lib/types";
 
-type ActionResult = { error?: string; success?: boolean; inviteUrl?: string };
+type ActionResult = {
+  error?: string;
+  success?: boolean;
+  inviteUrl?: string;
+  /** Lien de suivi remis au porteur juste après le dépôt de sa demande. */
+  suiviUrl?: string;
+};
 
 // ------------------------------------------------------------------
 // Bootstrap : création du tout premier compte Admin.
@@ -524,6 +530,11 @@ export async function deposerDemande(_prev: ActionResult, formData: FormData): P
     };
   }
 
+  // Le jeton de suivi est engendré ici plutôt que laissé au défaut de la base :
+  // le dépôt se fait sans session, et la RLS interdit à `anon` de relire la
+  // ligne insérée. Sans cela, impossible de remettre son lien au porteur.
+  const tokenSuivi = crypto.randomUUID();
+
   const supabase = await createServerClient();
   const { error } = await supabase.from("demandes_accueil").insert({
     nom,
@@ -534,6 +545,7 @@ export async function deposerDemande(_prev: ActionResult, formData: FormData): P
     pays,
     titre_projet: titreProjet,
     description,
+    token_suivi: tokenSuivi,
   });
 
   if (error) {
@@ -541,7 +553,7 @@ export async function deposerDemande(_prev: ActionResult, formData: FormData): P
   }
 
   revalidatePath("/demandes");
-  return { success: true };
+  return { success: true, suiviUrl: `${APP_URL}/suivi/${tokenSuivi}` };
 }
 
 /**
