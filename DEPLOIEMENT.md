@@ -4,9 +4,9 @@
 
 | | Service | Compte |
 |---|---|---|
-| Code | GitHub | organisation `arcinnolab` |
-| Base + Auth + Stockage | Supabase | organisation `ArcInnoLab`, projet `arcinnolab` |
-| Hébergement | Vercel | compte `arcinnolab` |
+| Code | GitHub | organisation `Arc-inno-lab`, dépôt **public** |
+| Base + Auth + Stockage | Supabase | organisation `ArcInnoLab`, projet `poewilykmxwpxqvkrrjq` |
+| Hébergement | Vercel | compte `arcinnolab-8306` |
 
 Ces trois comptes sont rattachés à l'adresse dédiée du projet, **pas** à un
 compte personnel ni à l'environnement KMØ. C'est délibéré : la plateforme est
@@ -17,10 +17,39 @@ Sur GitHub et Supabase, chaque membre est invité **nominativement** avec son
 propre compte — jamais par partage du mot de passe. Vercel, sur son plan
 gratuit, ne gère pas d'équipe : ce compte reste donc mono-utilisateur.
 
-## Variables d'environnement
+## Pourquoi le dépôt est public
 
-À déclarer sur Vercel (Settings → Environment Variables), pour les trois
-environnements (Production, Preview, Development) :
+Le plan Vercel gratuit **refuse de déployer depuis un dépôt appartenant à une
+organisation GitHub privée** — le message est explicite dans l'interface
+d'import. Trois issues existaient : payer le plan Pro, passer par GitHub Actions
+avec un jeton, ou ouvrir le dépôt. L'ouverture a été retenue : elle est gratuite,
+elle ne demande aucun jeton à gérer dans la durée, et elle se défend sur le fond
+pour un projet financé par des fonds publics européens.
+
+Ce choix n'expose aucun secret. La seule clé présente dans le code est la clé
+`anon` de Supabase, conçue pour être publique : elle part déjà dans le navigateur
+de chaque visiteur. Ce qui protège les données, ce sont les politiques RLS, qui
+s'appliquent côté Postgres (voir `supabase/migrations/`). Aucune clé
+`service_role` n'existe dans ce projet — toute la création de comptes passe par
+des fonctions `SECURITY DEFINER` appelées avec la clé anon.
+
+**Conséquence à tenir** : rien de confidentiel ne doit entrer dans ce dépôt.
+Ni jeton, ni mot de passe, ni donnée de porteur de projet, ni document
+contractuel. Si cette règle ne peut plus être tenue, il faut repasser le dépôt
+en privé et basculer sur le déploiement par GitHub Actions.
+
+## Configuration de la base
+
+Les identifiants Supabase sont inscrits dans `src/lib/config.ts`, avec les
+variables d'environnement en priorité et ces valeurs en repli. Un déploiement ne
+demande donc **aucune configuration** sur Vercel.
+
+Le revers, appris à nos dépens : ces valeurs de repli décident réellement de la
+base utilisée dès qu'aucune variable d'environnement n'est définie — ce qui est
+le cas par défaut sur un nouveau projet Vercel. **Changer de projet Supabase
+impose de changer ces deux lignes**, sinon rien ne bascule.
+
+Pour surcharger malgré tout (Settings → Environment Variables) :
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<ref-du-projet>.supabase.co
@@ -28,34 +57,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<clé anon publique>
 NEXT_PUBLIC_APP_URL=https://<domaine de production>
 ```
 
-Aucune clé `service_role` n'est nécessaire : toute la création de comptes passe
-par des fonctions Postgres `SECURITY DEFINER` appelées avec la clé anon
-(voir `supabase/migrations/…_002_auth_functions.sql`). C'est un choix de
-conception — il n'y a aucun secret sensible à configurer côté hébergement.
-
 ## Déployer
 
-**Tout `push` sur `main` déclenche un déploiement en production**, via
-`.github/workflows/deploy.yml`. C'est la voie normale, il n'y a rien à lancer à
-la main.
-
-Ce workflow appelle la CLI Vercel au lieu de l'intégration Git native, et ce
-n'est pas un caprice : **le plan Vercel gratuit refuse de déployer depuis un
-dépôt appartenant à une organisation GitHub**. Le code vit dans l'organisation
-`Arc.inno.lab` — c'est ce qui permet d'inviter les partenaires nominativement —
-donc l'intégration native est inutilisable tant que Vercel reste en Hobby. La
-CLI, elle, ne fait pas cette distinction.
-
-Le workflow ne s'arrête pas au déploiement : il vérifie ensuite par requête
-réelle que `/login`, `/a-propos` et `/projets` répondent correctement, et échoue
-si ce n'est pas le cas.
+**Tout `push` sur `main` déclenche un déploiement en production**, par
+l'intégration Git native de Vercel. Il n'y a rien à lancer à la main, aucun
+jeton, aucun workflow.
 
 ### Repli : déploiement depuis un poste
 
-Si l'intégration GitHub est indisponible :
-
 ```bash
-npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
+npx --yes vercel@latest deploy --prod
 ```
 
 Le jeton se crée sur Vercel (Settings → Tokens) et se range dans un fichier
