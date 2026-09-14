@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { DemandeAccueil, Orientation, Profile, Promotion } from "@/lib/types";
+import type {
+  DemandeAccueil,
+  Orientation,
+  Profile,
+  Promotion,
+  TourVote,
+  Vote,
+} from "@/lib/types";
 import {
   DEMANDE_STATUT_LABELS,
   DEMANDE_STATUT_COLORS,
@@ -15,8 +22,18 @@ import {
   FormPromotion,
   FormDecision,
 } from "./TraitementDemande";
+import { OuvrirTour, TourEnCours, ProncerDecision } from "./TourDeVote";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Lecture de l'heure courante, volontairement hors du composant : React
+ * interdit les appels impurs pendant le rendu, et à juste titre — leur résultat
+ * change à chaque exécution. L'instant est capté une fois, puis transmis.
+ */
+function instantCourant(): number {
+  return Date.now();
+}
 
 export default async function DemandePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -61,7 +78,34 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
         .single<Promotion>()
     : { data: null };
 
+  // Le dernier tour de vote, avec les avis déjà exprimés.
+  const { data: tours } = await supabase
+    .from("tours_vote")
+    .select("*, votes(*, votant:profiles!votes_votant_id_fkey(nom, prenom, organisation, photo_url))")
+    .eq("demande_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .returns<TourVote[]>();
+
+  const tour = tours?.[0] ?? null;
+  const monVote =
+    (tour?.votes ?? []).find((v: Vote) => v.votant_id === user!.id) ?? null;
+
+  const { data: votantsAttendus } = await supabase.rpc("nb_votants_attendus");
+
+  const estAdmin = profile?.role === "admin";
+  const tourOuvert = tour && (tour.statut === "en_cours" || tour.statut === "complet");
+  const tourClos = tour && tour.statut === "clos";
+  const decisionPrononcee = demande.statut === "admise" || demande.statut === "non_retenue";
+
+  // L'instruction n'a de sens qu'une fois la candidature versée à une promotion.
+  const candidature =
+    demande.statut === "en_attente_comite" ||
+    demande.statut === "en_instruction" ||
+    decisionPrononcee;
+
   const deposee = new Date(demande.created_at);
+  const maintenant = instantCourant();
 
   return (
     <div>
@@ -110,10 +154,49 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             <>
               <FormQualification demande={demande} />
               <FormOrientation demandeId={demande.id} orientations={orientations ?? []} />
-              {demande.statut !== "en_attente_comite" && demande.statut !== "admise" && (
+
+              {!candidature && (
                 <FormPromotion demandeId={demande.id} promotions={promotions ?? []} />
               )}
-              <FormDecision demandeId={demande.id} statut={demande.statut} />
+
+              {/* Instruction collégiale : consultation, puis décision. */}
+              {candidature && !tour && !decisionPrononcee && (
+                <OuvrirTour
+                  demandeId={demande.id}
+                  promotionId={demande.promotion_id}
+                  votantsAttendus={votantsAttendus ?? 1}
+                />
+              )}
+
+              {tourOuvert && (
+                <TourEnCours
+                  tour={tour!}
+                  demandeId={demande.id}
+                  monVote={monVote}
+                  estAdmin={estAdmin}
+                  maintenant={maintenant}
+                />
+              )}
+
+              {tourClos && estAdmin && !decisionPrononcee && (
+                <ProncerDecision
+                  tour={tour!}
+                  demandeId={demande.id}
+                  messageActuel={demande.message_porteur}
+                />
+              )}
+
+              {decisionPrononcee && demande.message_porteur && (
+                <section className="card p-5">
+                  <h2 className="mb-2 text-lg font-medium">Message communiqué au porteur</h2>
+                  <p className="whitespace-pre-wrap text-sm">{demande.message_porteur}</p>
+                  <p className="mt-3 text-xs" style={{ color: "var(--color-muted)" }}>
+                    Visible sur sa page de suivi.
+                  </p>
+                </section>
+              )}
+
+              {!candidature && <FormDecision demandeId={demande.id} statut={demande.statut} />}
             </>
           )}
         </div>

@@ -713,3 +713,199 @@ export async function creerPromotion(_prev: ActionResult, formData: FormData): P
   revalidatePath("/admin");
   return { success: true };
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Instruction collégiale : le tour de vote
+//
+// Le vote PRÉPARE le comité, il ne décide pas à sa place : clore un tour ne
+// prononce aucune décision, cela produit un avis. La décision reste un geste
+// explicite, posé par un humain, dans un second temps.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Ouvre une consultation de cinq jours auprès des partenaires. */
+export async function ouvrirTourVote(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const promotionId = String(formData.get("promotion_id") || "");
+  if (!demandeId) return { error: "Demande introuvable." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  // Un tour déjà ouvert sur la même demande rendrait les avis ininterprétables.
+  const { data: dejaOuvert } = await supabase
+    .from("tours_vote")
+    .select("id")
+    .eq("demande_id", demandeId)
+    .in("statut", ["en_cours", "complet"])
+    .maybeSingle();
+
+  if (dejaOuvert) {
+    return { error: "Une consultation est déjà ouverte sur cette demande." };
+  }
+
+  // Le nombre de votants attendus est figé maintenant : un partenaire qui
+  // rejoindrait la plateforme en cours de route ne doit pas rendre incomplet
+  // un tour qui ne l'était pas.
+  const { data: attendus } = await supabase.rpc("nb_votants_attendus");
+
+  const { error } = await supabase.from("tours_vote").insert({
+    demande_id: demandeId,
+    promotion_id: promotionId || null,
+    ouvert_par: user.id,
+    votants_attendus: attendus ?? 1,
+  });
+
+  if (error) return { error: "Ouverture impossible : " + error.message };
+
+  await supabase
+    .from("demandes_accueil")
+    .update({ statut: "en_instruction" })
+    .eq("id", demandeId);
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Enregistre ou met à jour l'avis de la personne connectée.
+ * Un avis défavorable exige un motif — la base le vérifie aussi, parce que
+ * c'est une règle de fond et non une validation de formulaire.
+ */
+export async function voter(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const tourId = String(formData.get("tour_id") || "");
+  const demandeId = String(formData.get("demande_id") || "");
+  const position = String(formData.get("position") || "");
+  const motif = String(formData.get("motif") || "").trim();
+
+  if (!tourId || !["favorable", "defavorable", "abstention"].includes(position)) {
+    return { error: "Avis invalide." };
+  }
+  if (position === "defavorable" && motif.length < 10) {
+    return {
+      error:
+        "Un avis défavorable doit être motivé : c'est ce motif qui permettra d'expliquer la décision au porteur.",
+    };
+  }
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { error } = await supabase
+    .from("votes")
+    .upsert(
+      { tour_id: tourId, votant_id: user.id, position, motif: motif || null },
+      { onConflict: "tour_id,votant_id" }
+    );
+
+  if (error) return { error: "Avis non enregistré : " + error.message };
+
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Clôt la consultation et rédige le brouillon de message.
+ *
+ * Deux cas de clôture : tous les avis sont rendus, ou l'échéance est passée et
+ * l'admin constate les absences. Le second existe parce que la règle « tous
+ * doivent voter » bloquerait sinon le porteur indéfiniment — ce que le
+ * manifeste promet précisément d'éviter.
+ */
+export async function cloreTourVote(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const tourId = String(formData.get("tour_id") || "");
+  const demandeId = String(formData.get("demande_id") || "");
+  const decision = String(formData.get("decision") || "");
+  if (!tourId || !["admise", "non_retenue"].includes(decision)) {
+    return { error: "Indiquez le sens de la décision." };
+  }
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { data: tour } = await supabase
+    .from("tours_vote")
+    .select("*")
+    .eq("id", tourId)
+    .single();
+
+  if (!tour) return { error: "Consultation introuvable." };
+
+  const { data: votes } = await supabase
+    .from("votes")
+    .select("position, motif")
+    .eq("tour_id", tourId);
+
+  const exprimes = votes ?? [];
+  if (exprimes.length === 0) {
+    return { error: "Aucun avis n'a été exprimé : il n'y a rien à synthétiser." };
+  }
+
+  const { data: demande } = await supabase
+    .from("demandes_accueil")
+    .select("titre_projet")
+    .eq("id", demandeId)
+    .single();
+
+  const { redigerMessagePorteur } = await import("@/lib/redaction-avis");
+  const redaction = await redigerMessagePorteur({
+    titreProjet: demande?.titre_projet ?? "votre projet",
+    decision: decision as "admise" | "non_retenue",
+    avis: exprimes.map((v) => ({ position: v.position, motif: v.motif })),
+    absents: Math.max(0, (tour.votants_attendus ?? 0) - exprimes.length),
+  });
+
+  const { error } = await supabase
+    .from("tours_vote")
+    .update({
+      statut: "clos",
+      clos_le: new Date().toISOString(),
+      clos_par: user.id,
+      synthese: redaction.texte,
+      synthese_le: new Date().toISOString(),
+      synthese_par_ia: redaction.parIA,
+    })
+    .eq("id", tourId);
+
+  if (error) return { error: "Clôture impossible : " + error.message };
+
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Prononce la décision et publie le message que lira le porteur.
+ *
+ * C'est le seul endroit où un texte devient visible à l'extérieur, et il passe
+ * toujours par un champ modifiable : ce qui part a été relu par quelqu'un.
+ */
+export async function prononcerDecision(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const statut = String(formData.get("statut") || "");
+  const message = String(formData.get("message_porteur") || "").trim();
+
+  if (!demandeId || !["admise", "non_retenue"].includes(statut)) {
+    return { error: "Décision invalide." };
+  }
+  if (statut === "non_retenue" && message.length < 30) {
+    return {
+      error:
+        "Un refus doit être expliqué au porteur. Rédigez le message avant de prononcer la décision.",
+    };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("demandes_accueil")
+    .update({ statut, message_porteur: message || null })
+    .eq("id", demandeId);
+
+  if (error) return { error: "Décision non enregistrée : " + error.message };
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}

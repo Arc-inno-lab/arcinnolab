@@ -22,6 +22,9 @@ type Suivi = {
   nb_orientations: number;
   promotion_nom: string | null;
   promotion_date_comite: string | null;
+  message_porteur: string | null;
+  instruction_en_cours: boolean;
+  instruction_echeance: string | null;
 };
 
 /**
@@ -75,11 +78,23 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
           "Le comité ne se réunit qu'une fois par an : l'attente peut être longue. Votre interlocuteur reste joignable d'ici là.",
         couleur: "#c98b1e",
       };
+    case "en_instruction":
+      return {
+        titre: "Votre projet est en cours d'instruction",
+        texte: s.instruction_echeance
+          ? `Les cinq structures du consortium examinent votre candidature et rendent chacune un avis. La consultation se termine le ${new Date(
+              s.instruction_echeance
+            ).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`
+          : "Les cinq structures du consortium examinent votre candidature et rendent chacune un avis.",
+        aFaire:
+          "Rien à faire : ces avis prépareront la décision du comité, qui vous sera communiquée ici même avec ses motifs.",
+        couleur: "#7c5cbf",
+      };
     case "admise":
       return {
         titre: "Votre projet est retenu",
         texte:
-          "Le comité mixte a validé votre entrée dans l'accompagnement ArcInnoLab. Un coach référent va construire votre parcours avec vous.",
+          "Votre candidature a été retenue pour l'accompagnement ArcInnoLab. Un coach référent va construire votre parcours avec vous.",
         aFaire: "Votre interlocuteur vous contacte pour définir les prochaines étapes.",
         couleur: "var(--color-primary)",
       };
@@ -87,7 +102,7 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
       return {
         titre: "Votre projet n'a pas été retenu pour l'accompagnement",
         texte:
-          "Le comité ne l'a pas sélectionné cette année. Cela ne dit rien de la valeur de votre projet : les places sont limitées et les critères tiennent à l'adéquation avec le programme.",
+          "Les motifs vous sont donnés ci-dessous. Cette décision ne porte pas de jugement sur la valeur de votre projet : les places sont limitées et les critères tiennent à l'adéquation avec le programme.",
         aFaire:
           "Votre interlocuteur peut vous orienter vers d'autres dispositifs. N'hésitez pas à le solliciter.",
         couleur: "var(--color-muted)",
@@ -152,6 +167,20 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
               {etat(suivi).aFaire}
             </p>
           </section>
+
+          {/* Le message de décision, quand il y en a un. Il est affiché tel que
+              l'équipe l'a validé — c'est la justification que le porteur est en
+              droit d'obtenir, surtout en cas de refus. */}
+          {suivi.message_porteur && (
+            <section className="card mb-5 p-6">
+              <h2 className="mb-3 text-lg font-medium">
+                {suivi.statut === "non_retenue"
+                  ? "Pourquoi votre projet n'a pas été retenu"
+                  : "Message de l'équipe"}
+              </h2>
+              <p className="whitespace-pre-wrap text-sm">{suivi.message_porteur}</p>
+            </section>
+          )}
 
           <section className="card mb-5 p-6">
             <h2 className="mb-3 text-lg font-medium">Repères</h2>

@@ -145,9 +145,63 @@ export type DemandeStatut =
   | "en_accueil"
   | "orientee"
   | "en_attente_comite"
+  | "en_instruction"
   | "admise"
   | "non_retenue"
   | "close";
+
+// ── Instruction collégiale ──────────────────────────────────────────────────
+
+export type VotePosition = "favorable" | "defavorable" | "abstention";
+export type TourStatut = "en_cours" | "complet" | "clos" | "abandonne";
+
+export interface Vote {
+  id: string;
+  tour_id: string;
+  votant_id: string;
+  position: VotePosition;
+  motif: string | null;
+  created_at: string;
+  updated_at: string;
+  votant?: Pick<Profile, "nom" | "prenom" | "organisation" | "photo_url"> | null;
+}
+
+export interface TourVote {
+  id: string;
+  demande_id: string;
+  promotion_id: string | null;
+  ouvert_par: string | null;
+  ouvert_le: string;
+  date_limite: string;
+  statut: TourStatut;
+  clos_le: string | null;
+  clos_par: string | null;
+  votants_attendus: number;
+  synthese: string | null;
+  synthese_le: string | null;
+  synthese_par_ia: boolean;
+  created_at: string;
+  votes?: Vote[];
+}
+
+export const VOTE_LABELS: Record<VotePosition, string> = {
+  favorable: "Favorable",
+  defavorable: "Défavorable",
+  abstention: "Abstention",
+};
+
+export const VOTE_COLORS: Record<VotePosition, string> = {
+  favorable: "var(--color-success)",
+  defavorable: "var(--color-danger)",
+  abstention: "var(--color-muted)",
+};
+
+export const TOUR_STATUT_LABELS: Record<TourStatut, string> = {
+  en_cours: "Consultation en cours",
+  complet: "Tous les avis sont rendus",
+  clos: "Consultation close",
+  abandonne: "Consultation abandonnée",
+};
 
 export type OrientationIssue = "en_attente" | "contact_etabli" | "sans_suite";
 
@@ -168,6 +222,8 @@ export interface DemandeAccueil {
   promotion_id: string | null;
   projet_id: string | null;
   profil_cree_id: string | null;
+  /** Message communiqué au porteur avec la décision, toujours relu par un humain. */
+  message_porteur: string | null;
   created_at: string;
   updated_at: string;
   coach?: Pick<Profile, "nom" | "prenom" | "photo_url"> | null;
@@ -233,6 +289,7 @@ export const DEMANDE_STATUT_LABELS: Record<DemandeStatut, string> = {
   en_accueil: "En accueil",
   orientee: "Orientée",
   en_attente_comite: "En attente du comité",
+  en_instruction: "En instruction",
   admise: "Admise",
   non_retenue: "Non retenue",
   close: "Close",
@@ -243,6 +300,7 @@ export const DEMANDE_STATUT_COLORS: Record<DemandeStatut, string> = {
   en_accueil: "var(--color-primary-2)",
   orientee: "var(--color-success)",
   en_attente_comite: "var(--color-warning, #c98b1e)",
+  en_instruction: "#7c5cbf",
   admise: "var(--color-primary)",
   non_retenue: "var(--color-muted)",
   close: "#8a8f98",
@@ -263,6 +321,7 @@ export const DEMANDE_STATUTS_ACTIFS: DemandeStatut[] = [
   "nouvelle",
   "en_accueil",
   "en_attente_comite",
+  "en_instruction",
 ];
 
 export const ROLE_LABELS: Record<UserRole, string> = {

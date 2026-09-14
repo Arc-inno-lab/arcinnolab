@@ -1069,3 +1069,272 @@ create trigger demandes_notifier_equipe
   after insert on public.demandes_accueil
   for each row execute function public.notifier_nouvelle_demande();
 
+-- ============================================================
+-- 20260914151007_013_tours_de_vote_partenaires.sql
+-- ============================================================
+-- Instruction collégiale d'une candidature : le tour de vote.
+--
+-- Rôle retenu : le vote PRÉPARE le comité, il ne décide pas à sa place. Les
+-- partenaires instruisent le dossier en cinq jours ; le comité mixte reste
+-- l'instance qui tranche. L'application matérialise cette distinction — un
+-- tour clos ne change pas le statut de la demande, il produit un avis.
+--
+-- Règle retenue : tous les partenaires doivent se prononcer. Elle est la plus
+-- légitime, mais elle a un défaut connu : un partenaire absent bloquerait le
+-- porteur indéfiniment. D'où la clôture sur constat d'absence, ouverte à
+-- l'admin une fois l'échéance passée, et qui laisse trace des non-réponses.
+
+create type public.vote_position as enum ('favorable', 'defavorable', 'abstention');
+
+create type public.tour_statut as enum (
+  'en_cours',   -- dans les cinq jours, tout le monde n'a pas voté
+  'complet',    -- tous les votants attendus se sont prononcés
+  'clos',       -- clos par l'admin (à l'échéance, ou après complétude)
+  'abandonne'   -- annulé sans suite
+);
+
+-- ── Tours de vote ───────────────────────────────────────────────────────────
+create table public.tours_vote (
+  id uuid primary key default gen_random_uuid(),
+  demande_id uuid not null references public.demandes_accueil(id) on delete cascade,
+  promotion_id uuid references public.promotions(id) on delete set null,
+
+  ouvert_par uuid references public.profiles(id) on delete set null,
+  ouvert_le timestamptz not null default now(),
+  -- Cinq jours pleins. Stockée et non recalculée : si la règle change un jour,
+  -- les tours déjà ouverts gardent l'échéance annoncée à leurs votants.
+  date_limite timestamptz not null default (now() + interval '5 days'),
+
+  statut public.tour_statut not null default 'en_cours',
+  clos_le timestamptz,
+  clos_par uuid references public.profiles(id) on delete set null,
+
+  -- Nombre de personnes attendues, figé à l'ouverture : si un partenaire
+  -- rejoint la plateforme pendant le tour, il ne doit pas rendre soudainement
+  -- incomplet un tour qui ne l'était pas.
+  votants_attendus integer not null default 0,
+
+  -- Synthèse des avis, destinée à l'instruction interne.
+  synthese text,
+  synthese_le timestamptz,
+  synthese_par_ia boolean not null default false,
+
+  created_at timestamptz not null default now()
+);
+
+create index tours_demande_idx on public.tours_vote (demande_id, created_at desc);
+create index tours_statut_idx on public.tours_vote (statut, date_limite);
+
+alter table public.tours_vote enable row level security;
+
+create policy tours_select on public.tours_vote
+  for select to authenticated
+  using (get_my_role() = any (array['admin'::user_role, 'partenaire'::user_role]));
+
+create policy tours_insert on public.tours_vote
+  for insert to authenticated
+  with check (get_my_role() = any (array['admin'::user_role, 'partenaire'::user_role]));
+
+create policy tours_update on public.tours_vote
+  for update to authenticated
+  using (get_my_role() = any (array['admin'::user_role, 'partenaire'::user_role]));
+
+-- ── Votes ───────────────────────────────────────────────────────────────────
+create table public.votes (
+  id uuid primary key default gen_random_uuid(),
+  tour_id uuid not null references public.tours_vote(id) on delete cascade,
+  votant_id uuid not null references public.profiles(id) on delete cascade,
+  position public.vote_position not null,
+  motif text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (tour_id, votant_id),
+
+  -- Un avis défavorable sans motif est inexploitable : ni pour le porteur, à
+  -- qui l'on doit une explication, ni pour les autres partenaires, qui doivent
+  -- pouvoir en débattre. La contrainte est posée ici plutôt que dans
+  -- l'interface : c'est une règle de fond, pas une validation de formulaire.
+  constraint vote_defavorable_motive check (
+    position <> 'defavorable' or (motif is not null and length(btrim(motif)) >= 10)
+  )
+);
+
+create index votes_tour_idx on public.votes (tour_id);
+
+alter table public.votes enable row level security;
+
+-- Les avis sont visibles de toute l'équipe : c'est une instruction collégiale,
+-- pas un scrutin secret. Chacun doit pouvoir lire les arguments des autres.
+create policy votes_select on public.votes
+  for select to authenticated
+  using (get_my_role() = any (array['admin'::user_role, 'partenaire'::user_role]));
+
+-- On ne vote que pour soi, et seulement tant que le tour est ouvert.
+create policy votes_insert on public.votes
+  for insert to authenticated
+  with check (
+    votant_id = auth.uid()
+    and get_my_role() = any (array['admin'::user_role, 'partenaire'::user_role])
+    and exists (
+      select 1 from public.tours_vote t
+      where t.id = tour_id and t.statut in ('en_cours', 'complet')
+    )
+  );
+
+create policy votes_update on public.votes
+  for update to authenticated
+  using (
+    votant_id = auth.uid()
+    and exists (
+      select 1 from public.tours_vote t
+      where t.id = tour_id and t.statut in ('en_cours', 'complet')
+    )
+  );
+
+-- ── Ce que lit le porteur ───────────────────────────────────────────────────
+-- Le message communiqué est distinct des motifs de vote : ceux-ci sont écrits
+-- entre professionnels et tombent souvent mal quand ils sont lus par la
+-- personne concernée. L'admin valide toujours ce qui part.
+alter table public.demandes_accueil
+  add column if not exists message_porteur text;
+
+comment on column public.demandes_accueil.message_porteur is
+  'Message communiqué au porteur avec la décision. Validé par un humain avant '
+  'publication, même lorsqu''il a été rédigé automatiquement.';
+
+-- ── Passage à l'état « en instruction » ─────────────────────────────────────
+alter type public.demande_statut add value if not exists 'en_instruction' after 'en_attente_comite';
+
+-- ============================================================
+-- 20260914151058_014_mecanique_du_tour_de_vote.sql
+-- ============================================================
+-- Mécanique du tour : qui est attendu, et quand le tour devient complet.
+-- Séparée de la migration 013 parce qu'elle utilise la valeur d'énumération
+-- « en_instruction » ajoutée là-bas : PostgreSQL interdit d'employer une
+-- valeur d'enum dans la transaction qui la crée.
+
+-- ── Qui doit voter ──────────────────────────────────────────────────────────
+-- Les parties prenantes : administrateurs et partenaires du consortium. Les
+-- porteurs n'ont évidemment pas voix au chapitre sur leur propre dossier.
+create or replace function public.nb_votants_attendus()
+returns integer
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select count(*)::integer from public.profiles
+  where role in ('admin', 'partenaire');
+$$;
+
+-- ── Bascule automatique en « complet » ──────────────────────────────────────
+-- Dès que tout le monde s'est prononcé, le tour n'attend plus personne. Il
+-- n'est pas clos pour autant : la clôture reste un geste humain, parce qu'elle
+-- déclenche la rédaction de l'avis.
+create or replace function public.maj_completude_tour()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  t_id uuid;
+  nb_votes integer;
+  nb_attendus integer;
+begin
+  t_id := coalesce(new.tour_id, old.tour_id);
+
+  select count(*) into nb_votes from public.votes where tour_id = t_id;
+  select votants_attendus into nb_attendus from public.tours_vote where id = t_id;
+
+  update public.tours_vote
+     set statut = case
+                    when statut in ('clos', 'abandonne') then statut
+                    when nb_votes >= nb_attendus then 'complet'::tour_statut
+                    else 'en_cours'::tour_statut
+                  end
+   where id = t_id;
+
+  return coalesce(new, old);
+end;
+$$;
+
+revoke execute on function public.maj_completude_tour() from public, anon, authenticated;
+
+drop trigger if exists votes_majcompletude on public.votes;
+create trigger votes_majcompletude
+  after insert or update or delete on public.votes
+  for each row execute function public.maj_completude_tour();
+
+-- ── Horodatage des votes modifiés ───────────────────────────────────────────
+create or replace function public.touch_vote()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+revoke execute on function public.touch_vote() from public, anon, authenticated;
+
+drop trigger if exists votes_touch on public.votes;
+create trigger votes_touch
+  before update on public.votes
+  for each row execute function public.touch_vote();
+
+-- ── Ce que voit le porteur, enrichi ─────────────────────────────────────────
+-- La fonction de suivi gagne l'état d'instruction et le message de décision.
+-- Elle continue de ne rien révéler des votes individuels : le porteur lit une
+-- position collective, jamais qui a dit quoi.
+--
+-- La suppression préalable est nécessaire : PostgreSQL refuse de changer le
+-- type de retour d'une fonction existante par un simple CREATE OR REPLACE.
+drop function if exists public.get_suivi_demande(uuid);
+
+create function public.get_suivi_demande(p_token uuid)
+returns table (
+  titre_projet text,
+  prenom text,
+  statut public.demande_statut,
+  deposee_le timestamptz,
+  mise_a_jour_le timestamptz,
+  prise_en_charge boolean,
+  nb_orientations integer,
+  promotion_nom text,
+  promotion_date_comite date,
+  message_porteur text,
+  instruction_en_cours boolean,
+  instruction_echeance timestamptz
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    d.titre_projet,
+    d.prenom,
+    d.statut,
+    d.created_at,
+    d.updated_at,
+    d.coach_id is not null,
+    (select count(*)::integer from public.orientations o where o.demande_id = d.id),
+    p.nom,
+    p.date_comite,
+    d.message_porteur,
+    exists (
+      select 1 from public.tours_vote t
+      where t.demande_id = d.id and t.statut in ('en_cours', 'complet')
+    ),
+    (select max(t.date_limite) from public.tours_vote t
+      where t.demande_id = d.id and t.statut in ('en_cours', 'complet'))
+  from public.demandes_accueil d
+  left join public.promotions p on p.id = d.promotion_id
+  where d.token_suivi = p_token;
+$$;
+
