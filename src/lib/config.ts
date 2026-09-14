@@ -19,4 +19,22 @@ export const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvZXdpbHlrbXh3cHhxdmtycmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDU1NDcsImV4cCI6MjEwNDYyMTU0N30.LbAyZIGSoMA8UBajxpVsCeEYhDxtRA_0mDirqgAszLI";
 
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://arcinnolab.vercel.app";
+/**
+ * Adresse publique de la plateforme, utilisée pour fabriquer les liens
+ * d'invitation (voir `src/app/actions.ts`). Une valeur erronée ici n'a rien
+ * d'anodin : les personnes invitées atterrissent sur un autre site, où leur
+ * jeton n'existe pas, et toutes les invitations échouent.
+ *
+ * L'ordre de priorité évite ce piège :
+ *  1. NEXT_PUBLIC_APP_URL, si on veut forcer une adresse (domaine personnalisé).
+ *  2. VERCEL_PROJECT_PRODUCTION_URL, fournie automatiquement par Vercel et
+ *     toujours à jour — y compris après un changement de nom de projet. Elle
+ *     n'est lisible que côté serveur, ce qui suffit : les liens d'invitation
+ *     sont fabriqués dans une server action.
+ *  3. En dernier recours, l'adresse de production connue au 14/09/2026.
+ */
+export const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://arcinnolab-five.vercel.app");
