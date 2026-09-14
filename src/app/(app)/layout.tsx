@@ -21,18 +21,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile) redirect("/login");
 
-  const [{ count: unreadCount }, { count: unreadDm }] = await Promise.all([
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("lu", false),
-    supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("destinataire_id", user.id)
-      .eq("lu", false),
-  ]);
+  const equipe = profile.role === "admin" || profile.role === "partenaire";
+
+  const [{ count: unreadCount }, { count: unreadDm }, { count: demandesEnAttente }] =
+    await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("lu", false),
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("destinataire_id", user.id)
+        .eq("lu", false),
+      // Seules les demandes que personne n'a encore prises en charge font
+      // l'objet d'un badge : c'est l'absence de réponse qui doit alerter, pas
+      // le volume de travail en cours.
+      equipe
+        ? supabase
+            .from("demandes_accueil")
+            .select("id", { count: "exact", head: true })
+            .eq("statut", "nouvelle")
+        : Promise.resolve({ count: 0 }),
+    ]);
 
   const items: NavItem[] = [
     { href: "/", label: "Accueil" },
@@ -40,7 +52,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/messages", label: "Messages", badge: unreadDm ?? 0 },
     { href: "/notifications", label: "Notifications", badge: unreadCount ?? 0 },
   ];
-  if (profile.role === "admin" || profile.role === "partenaire") {
+  if (equipe) {
+    // Placée juste après Accueil : la file des porteurs qui attendent une
+    // réponse passe avant le suivi des projets déjà accompagnés.
+    items.splice(1, 0, {
+      href: "/demandes",
+      label: "Demandes",
+      badge: demandesEnAttente ?? 0,
+    });
     items.push({ href: "/invitations/new", label: "Inviter" });
   }
   if (profile.role === "admin") {

@@ -477,3 +477,227 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Accueil & orientation
+//
+// La démarche ArcInnoLab fait tourner deux services sur deux horloges : un
+// accueil permanent où le coach oriente seul, et un accompagnement en
+// promotion annuelle dont le comité mixte décide. Le comité ne siégeant
+// qu'une fois par an, l'orientation est le service principal onze mois sur
+// douze — elle ne doit donc jamais dépendre de lui.
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Dépôt d'une demande d'accueil. **Seul point de la plateforme ouvert sans
+ * compte** : un guichet où il faut être invité n'est pas un guichet. La
+ * plateforme reste fermée pour autant — c'est un coach qui invite ensuite,
+ * une fois la demande qualifiée.
+ *
+ * La policy RLS n'autorise à `anon` que l'insertion : rien ne peut être relu.
+ */
+export async function deposerDemande(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const nom = String(formData.get("nom") || "").trim();
+  const prenom = String(formData.get("prenom") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const telephone = String(formData.get("telephone") || "").trim();
+  const organisation = String(formData.get("organisation") || "").trim();
+  const pays = String(formData.get("pays") || "").trim();
+  const titreProjet = String(formData.get("titre_projet") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+
+  if (!nom || !prenom || !email || !titreProjet || !description) {
+    return { error: "Merci de renseigner tous les champs obligatoires." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Cette adresse email ne semble pas valide." };
+  }
+  if (pays !== "france" && pays !== "suisse") {
+    return { error: "Merci d'indiquer où se situe votre projet." };
+  }
+  // Garde-fou anti-dépôt accidentel plus qu'anti-spam : une description d'une
+  // ligne ne permet à personne de préparer un rendez-vous d'accueil utile.
+  if (description.length < 40) {
+    return {
+      error:
+        "Décrivez votre projet un peu plus longuement (quelques phrases) : c'est ce qui permet de vous orienter vers la bonne personne.",
+    };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.from("demandes_accueil").insert({
+    nom,
+    prenom,
+    email,
+    telephone: telephone || null,
+    organisation: organisation || null,
+    pays,
+    titre_projet: titreProjet,
+    description,
+  });
+
+  if (error) {
+    return { error: "Votre demande n'a pas pu être enregistrée. Réessayez dans un instant." };
+  }
+
+  revalidatePath("/demandes");
+  return { success: true };
+}
+
+/**
+ * Prise en charge d'une demande par un coach. Le fait de s'attribuer une
+ * demande est ce qui évite qu'elle reste sans réponse : tant que personne ne
+ * s'en saisit, elle reste « nouvelle » et remonte en tête de file.
+ */
+export async function prendreEnCharge(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  if (!demandeId) return { error: "Demande introuvable." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { error } = await supabase
+    .from("demandes_accueil")
+    .update({ coach_id: user.id, statut: "en_accueil" })
+    .eq("id", demandeId);
+
+  if (error) return { error: "Prise en charge impossible : " + error.message };
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Qualification : le coach renseigne le persona et ses notes après le rendez-vous
+ * d'accueil. Le persona n'est pas décoratif — c'est lui qui indique quel pack de
+ * services a du sens, et quatre des six profils n'ont pas besoin d'une promotion.
+ */
+export async function qualifierDemande(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const persona = String(formData.get("persona") || "").trim();
+  const notes = String(formData.get("notes_coach") || "").trim();
+  if (!demandeId) return { error: "Demande introuvable." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("demandes_accueil")
+    .update({ persona: persona || null, notes_coach: notes || null })
+    .eq("id", demandeId);
+
+  if (error) return { error: "Enregistrement impossible : " + error.message };
+
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Orientation : la voie rapide. Le coach met en relation et trace l'issue.
+ * Tracer l'issue n'est pas de la bureaucratie : sans elle, personne ne sait si
+ * la mise en relation a produit quelque chose, et le manifeste promet qu'un
+ * porteur « n'est jamais seul ».
+ */
+export async function orienterDemande(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const structure = String(formData.get("structure") || "").trim();
+  const motif = String(formData.get("motif") || "").trim();
+  const dateRelance = String(formData.get("date_relance") || "").trim();
+  if (!demandeId || !structure) {
+    return { error: "Indiquez au moins vers quelle structure vous orientez." };
+  }
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { error } = await supabase.from("orientations").insert({
+    demande_id: demandeId,
+    structure,
+    motif: motif || null,
+    date_relance: dateRelance || null,
+    cree_par: user.id,
+  });
+
+  if (error) return { error: "Orientation non enregistrée : " + error.message };
+
+  // Une demande orientée est traitée, mais le suivi de l'issue continue.
+  await supabase.from("demandes_accueil").update({ statut: "orientee" }).eq("id", demandeId);
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/** Mise à jour de l'issue d'une orientation, lors de la relance. */
+export async function majIssueOrientation(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const orientationId = String(formData.get("orientation_id") || "");
+  const demandeId = String(formData.get("demande_id") || "");
+  const issue = String(formData.get("issue") || "");
+  if (!orientationId || !issue) return { error: "Orientation introuvable." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.from("orientations").update({ issue }).eq("id", orientationId);
+  if (error) return { error: "Mise à jour impossible : " + error.message };
+
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Versement à une promotion : la voie longue. Le comité mixte ne siégeant
+ * qu'une fois par an, la demande entre ici dans une file d'attente qui peut
+ * durer des mois. C'est précisément pour ça que le porteur doit pouvoir savoir
+ * quand siège le prochain comité.
+ */
+export async function verserEnPromotion(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const promotionId = String(formData.get("promotion_id") || "");
+  if (!demandeId || !promotionId) return { error: "Sélectionnez une promotion." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("demandes_accueil")
+    .update({ promotion_id: promotionId, statut: "en_attente_comite" })
+    .eq("id", demandeId);
+
+  if (error) return { error: "Enregistrement impossible : " + error.message };
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/** Décision du comité, ou clôture d'une demande sans suite. */
+export async function deciderDemande(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const statut = String(formData.get("statut") || "");
+  const permis = ["admise", "non_retenue", "close", "en_accueil"];
+  if (!demandeId || !permis.includes(statut)) return { error: "Décision invalide." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.from("demandes_accueil").update({ statut }).eq("id", demandeId);
+  if (error) return { error: "Décision non enregistrée : " + error.message };
+
+  revalidatePath("/demandes");
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/** Création d'une promotion (réservée à l'Admin par la RLS). */
+export async function creerPromotion(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const nom = String(formData.get("nom") || "").trim();
+  const dateComite = String(formData.get("date_comite") || "").trim();
+  if (!nom) return { error: "Donnez un nom à la promotion." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("promotions")
+    .insert({ nom, date_comite: dateComite || null });
+
+  if (error) return { error: "Création impossible : " + error.message };
+
+  revalidatePath("/demandes");
+  revalidatePath("/admin");
+  return { success: true };
+}

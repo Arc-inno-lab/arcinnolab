@@ -26,9 +26,14 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // "/a-propos" est public : c'est la page projet exigée par le guide de
-  // communication Interreg (p. 5), elle doit être consultable sans compte.
-  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos"];
+  // Deux pages sont publiques, pour deux raisons distinctes :
+  //  · "/a-propos" est la page projet exigée par le guide de communication
+  //    Interreg (p. 5), qui doit être consultable sans compte ;
+  //  · "/demande" est la porte d'entrée du guichet. Un guichet unique où il
+  //    faudrait déjà être invité pour se manifester ne serait pas un guichet.
+  //    Le dépôt n'ouvre aucun compte : la RLS n'autorise là que l'insertion,
+  //    jamais la lecture (cf. migration 010).
+  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos", "/demande"];
   const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p));
 
   if (!user && !isPublic) {

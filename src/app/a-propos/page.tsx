@@ -30,9 +30,14 @@ export default function AProposPage() {
     <main id="main" className="mx-auto w-full max-w-3xl px-4 py-10">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <Logo />
-        <Link href="/login" className="btn btn-outline">
-          Accéder à la plateforme
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/demande" className="btn btn-primary">
+            Déposer un projet
+          </Link>
+          <Link href="/login" className="btn btn-outline">
+            Accéder à la plateforme
+          </Link>
+        </div>
       </div>
 
       <div className="hero mb-8">
