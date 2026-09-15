@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, Invitation } from "@/lib/types";
+import type { Profile, Invitation, Promotion } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/types";
 import { CancelInvitationButton } from "./CancelInvitationButton";
+import { GestionCompte } from "./GestionCompte";
+import { NouvellePromotion } from "../demandes/NouvellePromotion";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -23,9 +25,70 @@ export default async function AdminPage() {
     .order("date_envoi", { ascending: false })
     .returns<Invitation[]>();
 
+  const { data: promotions } = await supabase
+    .from("promotions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .returns<Promotion[]>();
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold">Back-office administrateur</h1>
+
+      {/* Les promotions viennent en premier : sans promotion ouverte, aucune
+          candidature ne peut être versée au comité, et toute la voie
+          « accompagnement » reste théorique. C'est la première chose à faire
+          sur une plateforme neuve, donc la première chose à voir. */}
+      <section aria-labelledby="promotions-heading" className="mb-10">
+        <h2 id="promotions-heading" className="mb-1 text-lg font-medium">
+          Promotions ({promotions?.length ?? 0})
+        </h2>
+        <p className="mb-3 text-sm" style={{ color: "var(--color-muted)" }}>
+          Une promotion, c&apos;est la cohorte examinée par un comité mixte
+          franco-suisse donné. Tant qu&apos;il n&apos;y en a aucune
+          d&apos;ouverte, une candidature retenue n&apos;a nulle part où aller.
+        </p>
+
+        {!promotions?.length ? (
+          <div className="card mb-4 p-4 text-sm">
+            <p className="mb-1 font-medium">Aucune promotion n&apos;existe encore.</p>
+            <p style={{ color: "var(--color-muted)" }}>
+              Créez la première ci-dessous, avec la date réelle du prochain
+              comité si vous la connaissez.
+            </p>
+          </div>
+        ) : (
+          <ul className="mb-4 flex flex-col gap-2">
+            {promotions.map((p) => (
+              <li key={p.id} className="card flex flex-wrap items-center justify-between gap-2 p-4">
+                <div>
+                  <p className="font-medium">{p.nom}</p>
+                  <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                    {p.date_comite
+                      ? `Comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}`
+                      : "Date du comité non renseignée"}
+                  </p>
+                </div>
+                <span
+                  className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                  style={{
+                    background: p.ouverte ? "var(--color-success)" : "var(--color-muted)",
+                    color: "#fff",
+                  }}
+                >
+                  {p.ouverte ? "Ouverte" : "Close"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <NouvellePromotion />
+      </section>
 
       <section aria-labelledby="comptes-heading" className="mb-10">
         <h2 id="comptes-heading" className="mb-3 text-lg font-medium">
@@ -40,20 +103,24 @@ export default async function AdminPage() {
                 <th scope="col" className="px-4 py-2 font-medium">Email</th>
                 <th scope="col" className="px-4 py-2 font-medium">Rôle</th>
                 <th scope="col" className="px-4 py-2 font-medium">Organisation</th>
+                <th scope="col" className="px-4 py-2 font-medium">Gestion</th>
               </tr>
             </thead>
             <tbody>
               {profiles?.map((p) => (
-                <tr key={p.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
+                <tr key={p.id} className="border-b last:border-0 align-top" style={{ borderColor: "var(--color-border)" }}>
                   <td className="px-4 py-2">{p.prenom} {p.nom}</td>
                   <td className="px-4 py-2">{p.email}</td>
                   <td className="px-4 py-2">{ROLE_LABELS[p.role]}</td>
                   <td className="px-4 py-2">{p.organisation || "—"}</td>
+                  <td className="px-4 py-2">
+                    <GestionCompte profil={p} estMoi={p.id === me.id} />
+                  </td>
                 </tr>
               ))}
               {!profiles?.length && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-3 text-center" style={{ color: "var(--color-muted)" }}>
+                  <td colSpan={5} className="px-4 py-3 text-center" style={{ color: "var(--color-muted)" }}>
                     Aucun compte.
                   </td>
                 </tr>

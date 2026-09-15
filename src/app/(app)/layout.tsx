@@ -46,6 +46,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         : Promise.resolve({ count: 0 }),
     ]);
 
+  // Les consultations ouvertes où cette personne n'a pas encore voté comptent
+  // aussi : un avis attendu est une demande adressée à elle personnellement,
+  // plus pressante encore qu'une demande dans la file commune.
+  let avisAttendus = 0;
+  if (equipe) {
+    const [{ data: tours }, { data: votes }] = await Promise.all([
+      supabase
+        .from("tours_vote")
+        .select("id")
+        .eq("statut", "en_cours")
+        .returns<{ id: string }[]>(),
+      supabase
+        .from("votes")
+        .select("tour_id")
+        .eq("votant_id", user.id)
+        .returns<{ tour_id: string }[]>(),
+    ]);
+    const votes_ = new Set((votes ?? []).map((v) => v.tour_id));
+    avisAttendus = (tours ?? []).filter((t) => !votes_.has(t.id)).length;
+  }
+
   const items: NavItem[] = [
     { href: "/", label: "Accueil" },
     { href: "/projets", label: "Projets" },
@@ -58,7 +79,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     items.splice(1, 0, {
       href: "/demandes",
       label: "Demandes",
-      badge: demandesEnAttente ?? 0,
+      badge: (demandesEnAttente ?? 0) + avisAttendus,
     });
     items.push({ href: "/invitations/new", label: "Inviter" });
   }

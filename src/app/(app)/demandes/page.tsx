@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DemandeAccueil, Profile, Promotion } from "@/lib/types";
-import { NouvellePromotion } from "./NouvellePromotion";
 import {
   DEMANDE_STATUT_LABELS,
   DEMANDE_STATUT_COLORS,
@@ -74,12 +73,44 @@ export default async function DemandesPage({
   // Les porteurs n'ont rien à faire dans la file d'accueil de l'équipe.
   if (profile?.role === "porteur") redirect("/");
 
+  // Les consultations ouvertes où cette personne n'a pas encore voté. C'est la
+  // seule vue qui répond à la question « qu'attend-on de moi ? » : une
+  // notification se perd, une file partagée ne dit pas à qui le tour.
+  const { data: toursOuverts } = await supabase
+    .from("tours_vote")
+    .select("id, demande_id")
+    .eq("statut", "en_cours")
+    .returns<{ id: string; demande_id: string }[]>();
+
+  const { data: mesVotes } = await supabase
+    .from("votes")
+    .select("tour_id")
+    .eq("votant_id", user!.id)
+    .returns<{ tour_id: string }[]>();
+
+  const dejaVotes = new Set((mesVotes ?? []).map((v) => v.tour_id));
+  const demandesAvisAttendu = (toursOuverts ?? [])
+    .filter((t) => !dejaVotes.has(t.id))
+    .map((t) => t.demande_id);
+
   let requete = supabase
     .from("demandes_accueil")
     .select("*, coach:profiles!demandes_accueil_coach_id_fkey(nom, prenom, photo_url)");
 
-  if (filtre === "a_traiter") {
-    requete = requete.in("statut", ["nouvelle", "en_accueil"]);
+  if (filtre === "avis") {
+    // `in` sur une liste vide renvoie une erreur côté PostgREST : un id
+    // impossible tient lieu de liste vide.
+    requete = requete.in(
+      "id",
+      demandesAvisAttendu.length
+        ? demandesAvisAttendu
+        : ["00000000-0000-0000-0000-000000000000"]
+    );
+  } else if (filtre === "a_traiter") {
+    // « en_instruction » appartient bien au travail en cours : une demande dont
+    // la consultation est ouverte disparaissait de la file, ce qui donnait
+    // l'impression que rien ne s'était passé.
+    requete = requete.in("statut", ["nouvelle", "en_accueil", "en_instruction"]);
   } else if (filtre === "comite") {
     requete = requete.eq("statut", "en_attente_comite");
   } else if (filtre === "orientees") {
@@ -102,6 +133,12 @@ export default async function DemandesPage({
   const lignes = preparerLignes(demandes ?? []);
 
   const onglets = [
+    {
+      cle: "avis",
+      label: demandesAvisAttendu.length
+        ? `Mon avis attendu (${demandesAvisAttendu.length})`
+        : "Mon avis attendu",
+    },
     { cle: "a_traiter", label: "À traiter" },
     { cle: "comite", label: "En attente du comité" },
     { cle: "orientees", label: "Orientées" },
@@ -136,7 +173,33 @@ export default async function DemandesPage({
         </div>
       )}
 
-      {profile?.role === "admin" && <NouvellePromotion />}
+      {!promotions?.length && profile?.role === "admin" && (
+        <div className="card mb-5 p-4">
+          <p className="text-sm">
+            <strong>Aucune promotion ouverte.</strong> Tant qu&apos;il n&apos;y
+            en a pas, une candidature retenue n&apos;a nulle part où aller.
+          </p>
+          <Link href="/admin" className="btn btn-outline mt-3">
+            Créer une promotion
+          </Link>
+        </div>
+      )}
+
+      {demandesAvisAttendu.length > 0 && filtre !== "avis" && (
+        <div className="card mb-5 p-4">
+          <p className="text-sm">
+            <strong>
+              {demandesAvisAttendu.length === 1
+                ? "Une consultation attend votre avis."
+                : `${demandesAvisAttendu.length} consultations attendent votre avis.`}
+            </strong>{" "}
+            Un tour se clôt avec ou sans vous.
+          </p>
+          <Link href="/demandes?filtre=avis" className="btn btn-primary mt-3">
+            Donner mon avis
+          </Link>
+        </div>
+      )}
 
       <div className="mb-5 flex flex-wrap gap-2">
         {onglets.map((o) => (
@@ -158,9 +221,11 @@ export default async function DemandesPage({
 
       {!lignes.length ? (
         <div className="card p-5 text-sm" style={{ color: "var(--color-muted)" }}>
-          {filtre === "a_traiter"
-            ? "Aucune demande en attente. La file est vide."
-            : "Aucune demande dans cette vue."}
+          {filtre === "avis"
+            ? "Aucune consultation n'attend votre avis."
+            : filtre === "a_traiter"
+              ? "Aucune demande en attente. La file est vide."
+              : "Aucune demande dans cette vue."}
         </div>
       ) : (
         <ul className="flex flex-col gap-3">

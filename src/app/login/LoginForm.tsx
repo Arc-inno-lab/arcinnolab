@@ -16,6 +16,7 @@ export function LoginForm() {
 
   const bootstrapMsg = params.get("bootstrap") === "ok";
   const inviteMsg = params.get("invite") === "ok";
+  const reinitMsg = params.get("reinitialise") === "ok";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +55,11 @@ export function LoginForm() {
         {inviteMsg && (
           <p className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">
             Compte créé avec succès. Connectez-vous ci-dessous.
+          </p>
+        )}
+        {reinitMsg && (
+          <p className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">
+            Mot de passe enregistré. Connectez-vous avec celui-ci.
           </p>
         )}
 

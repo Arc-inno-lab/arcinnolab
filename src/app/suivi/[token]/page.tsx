@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/Logo";
 import { InterregMention } from "@/components/InterregFooter";
-import type { DemandeStatut } from "@/lib/types";
+import type { DemandeStatut, MessageSuivi } from "@/lib/types";
+import { EchangePorteur } from "./EchangePorteur";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,9 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
   const { data } = await supabase.rpc("get_suivi_demande", { p_token: token });
   const suivi = (data as Suivi[] | null)?.[0];
 
+  const { data: fil } = await supabase.rpc("get_messages_suivi", { p_token: token });
+  const messages = (fil as MessageSuivi[] | null) ?? [];
+
   return (
     <main id="main" className="mx-auto w-full max-w-2xl px-4 py-10">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -205,6 +209,8 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
               )}
             </dl>
           </section>
+
+          <EchangePorteur token={token} messages={messages} />
 
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
             Cette page se met à jour toute seule. Conservez son adresse : elle

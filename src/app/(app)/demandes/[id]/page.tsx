@@ -8,6 +8,7 @@ import type {
   Promotion,
   TourVote,
   Vote,
+  MessageDemande,
 } from "@/lib/types";
 import {
   DEMANDE_STATUT_LABELS,
@@ -23,6 +24,8 @@ import {
   FormDecision,
 } from "./TraitementDemande";
 import { OuvrirTour, TourEnCours, ProncerDecision } from "./TourDeVote";
+import { Echange } from "./Echange";
+import { APP_URL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +95,24 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
     (tour?.votes ?? []).find((v: Vote) => v.votant_id === user!.id) ?? null;
 
   const { data: votantsAttendus } = await supabase.rpc("nb_votants_attendus");
+
+  const { data: messages } = await supabase
+    .from("messages_demande")
+    .select("*, profil:profiles!messages_demande_auteur_id_fkey(nom, prenom, photo_url)")
+    .eq("demande_id", id)
+    .order("created_at", { ascending: true })
+    .returns<MessageDemande[]>();
+
+  // Le jeton de suivi n'est jamais montré au public : il sert ici à donner à
+  // l'équipe le lien exact que le porteur utilise, pour le lui renvoyer s'il
+  // l'a perdu et pour vérifier ce qu'il voit réellement.
+  const { data: jeton } = await supabase
+    .from("demandes_accueil")
+    .select("token_suivi")
+    .eq("id", id)
+    .single<{ token_suivi: string }>();
+
+  const lienSuivi = `${APP_URL}/suivi/${jeton?.token_suivi ?? ""}`;
 
   const estAdmin = profile?.role === "admin";
   const tourOuvert = tour && (tour.statut === "en_cours" || tour.statut === "complet");
@@ -180,6 +201,13 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             <h2 className="mb-3 text-lg font-medium">Ce que le porteur a écrit</h2>
             <p className="whitespace-pre-wrap text-sm">{demande.description}</p>
           </section>
+
+          <Echange
+            demandeId={demande.id}
+            messages={messages ?? []}
+            prenomPorteur={demande.prenom}
+            lienSuivi={lienSuivi}
+          />
 
           {!demande.coach_id ? (
             <section className="card p-5">

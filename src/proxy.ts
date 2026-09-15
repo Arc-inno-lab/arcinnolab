@@ -37,8 +37,19 @@ export async function proxy(request: NextRequest) {
   //    personnel remis au dépôt. La page ne lit rien directement — elle passe
   //    par une fonction qui ne renvoie que ce qui le concerne, jamais les
   //    notes internes (cf. migration 012) ;
+  //  · "/reinitialiser" : quelqu'un qui a perdu son mot de passe ne peut par
+  //    définition pas être connecté pour le changer. Le jeton est à usage
+  //    unique et vérifié côté base (cf. migration 015) ;
   //  · "/login", "/bootstrap", "/invite" : les portes d'authentification.
-  const publicPaths = ["/login", "/bootstrap", "/invite", "/a-propos", "/demande", "/suivi"];
+  const publicPaths = [
+    "/login",
+    "/bootstrap",
+    "/invite",
+    "/a-propos",
+    "/demande",
+    "/suivi",
+    "/reinitialiser",
+  ];
 
   // La comparaison est volontairement stricte : chemin identique, ou suivi d'un
   // « / ». Un simple startsWith laisserait passer "/demandes" — la file de

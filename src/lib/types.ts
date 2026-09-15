@@ -116,7 +116,12 @@ export type NotificationType =
   // Émise par un trigger à chaque dépôt sur la page publique, pour tous les
   // admins et partenaires (cf. migration 012). Sans elle, une demande peut
   // rester invisible jusqu'à ce que quelqu'un pense à ouvrir la file.
-  | "demande_accueil";
+  | "demande_accueil"
+  // Ouverture d'une consultation : sans cette alerte, un partenaire n'a aucun
+  // moyen d'apprendre qu'un avis lui est demandé (cf. migration 015).
+  | "tour_vote"
+  // Message écrit par un porteur depuis sa page de suivi.
+  | "message_demande";
 
 export interface AppNotification {
   id: string;
@@ -202,6 +207,39 @@ export const TOUR_STATUT_LABELS: Record<TourStatut, string> = {
   clos: "Consultation close",
   abandonne: "Consultation abandonnée",
 };
+
+// ── Échanges avec le porteur ────────────────────────────────────────────────
+
+export type AuteurMessage = "porteur" | "equipe";
+
+export interface MessageDemande {
+  id: string;
+  demande_id: string;
+  auteur: AuteurMessage;
+  auteur_id: string | null;
+  contenu: string;
+  lu_par_equipe: boolean;
+  lu_par_porteur: boolean;
+  created_at: string;
+  profil?: Pick<Profile, "nom" | "prenom" | "photo_url"> | null;
+}
+
+/** Ce que le porteur lit de son fil, via son jeton — sans identité d'équipe. */
+export interface MessageSuivi {
+  auteur: AuteurMessage;
+  contenu: string;
+  envoye_le: string;
+}
+
+export interface Reinitialisation {
+  id: string;
+  user_id: string;
+  token: string;
+  cree_par: string | null;
+  created_at: string;
+  expire_le: string;
+  utilise_le: string | null;
+}
 
 export type OrientationIssue = "en_attente" | "contact_etabli" | "sans_suite";
 

@@ -909,3 +909,121 @@ export async function prononcerDecision(_prev: ActionResult, formData: FormData)
   revalidatePath(`/demandes/${demandeId}`);
   return { success: true };
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Échanges avec le porteur, et gestion des accès
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Réponse de l'équipe au porteur, depuis la fiche de traitement. */
+export async function repondreAuPorteur(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const demandeId = String(formData.get("demande_id") || "");
+  const contenu = String(formData.get("contenu") || "").trim();
+  if (!demandeId || contenu.length < 2) return { error: "Message vide." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { error } = await supabase.from("messages_demande").insert({
+    demande_id: demandeId,
+    auteur: "equipe",
+    auteur_id: user.id,
+    contenu,
+    lu_par_equipe: true,
+  });
+
+  if (error) return { error: "Message non envoyé : " + error.message };
+
+  revalidatePath(`/demandes/${demandeId}`);
+  return { success: true };
+}
+
+/**
+ * Message écrit par le porteur depuis sa page de suivi.
+ * Il n'a pas de compte : son jeton tient lieu d'authentification, et la
+ * fonction Postgres le vérifie elle-même.
+ */
+export async function posterMessageSuivi(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const token = String(formData.get("token") || "");
+  const contenu = String(formData.get("contenu") || "").trim();
+  if (!token) return { error: "Lien de suivi invalide." };
+  if (contenu.length < 2) return { error: "Écrivez votre message avant de l'envoyer." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.rpc("poster_message_porteur", {
+    p_token: token,
+    p_contenu: contenu,
+  });
+
+  if (error) return { error: "Message non envoyé. Réessayez dans un instant." };
+
+  revalidatePath(`/suivi/${token}`);
+  return { success: true };
+}
+
+/**
+ * Engendre un lien de réinitialisation pour un membre de l'équipe.
+ *
+ * Faute de service d'envoi d'e-mails, un mot de passe oublié serait sans issue.
+ * L'administrateur transmet ce lien par le moyen de son choix ; la personne
+ * choisit elle-même son nouveau mot de passe, que personne d'autre ne voit.
+ */
+export async function creerLienReinitialisation(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const userId = String(formData.get("user_id") || "");
+  if (!userId) return { error: "Compte introuvable." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { data, error } = await supabase
+    .from("reinitialisations")
+    .insert({ user_id: userId, cree_par: user.id })
+    .select("token")
+    .single();
+
+  if (error) return { error: "Création impossible : " + error.message };
+
+  revalidatePath("/admin");
+  return { success: true, inviteUrl: `${APP_URL}/reinitialiser/${data.token}` };
+}
+
+/** Application du nouveau mot de passe par la personne elle-même. */
+export async function appliquerReinitialisation(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const token = String(formData.get("token") || "");
+  const password = String(formData.get("password") || "");
+  if (!token) return { error: "Lien invalide." };
+  if (password.length < 8) return { error: "Mot de passe trop court (8 caractères minimum)." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.rpc("appliquer_reinitialisation", {
+    p_token: token,
+    p_password: password,
+  });
+
+  if (error) return { error: error.message };
+
+  redirect("/login?reinitialise=ok");
+}
+
+/** Change le rôle d'un compte. Réservé à l'admin par la RLS et le trigger. */
+export async function changerRole(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const userId = String(formData.get("user_id") || "");
+  const role = String(formData.get("role") || "");
+  if (!userId || !["admin", "partenaire", "porteur"].includes(role)) {
+    return { error: "Rôle invalide." };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.from("profiles").update({ role }).eq("id", userId);
+  if (error) return { error: "Changement impossible : " + error.message };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
