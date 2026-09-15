@@ -66,17 +66,62 @@ export function KanbanEtapes({
     startTransition(() => updateEtapeStatut(projetId, etapeId, statut));
   }
 
+  const validees = etapes.filter((e) => e.statut === "validee").length;
+  const enRetard = etapes.filter(
+    (e) =>
+      e.date_echeance &&
+      e.statut !== "validee" &&
+      new Date(e.date_echeance) < new Date(new Date().toDateString())
+  ).length;
+  const avancement = etapes.length ? Math.round((validees / etapes.length) * 100) : 0;
+
   return (
-    <section aria-labelledby="etapes-heading" className="mb-8">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <h2 id="etapes-heading" className="text-lg font-medium">
-          Passeport projet — étapes ({etapes.length})
-        </h2>
+    <section aria-labelledby="etapes-heading" className="card p-5">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="etapes-heading" className="text-lg font-medium">
+            Passeport projet
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+            Les jalons de l&apos;accompagnement. Cliquez sur une étape pour
+            l&apos;ouvrir : description, date butoir, statut et discussion
+            s&apos;affichent à droite, sans quitter le tableau.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-semibold">
+            {validees}
+            <span className="text-base" style={{ color: "var(--color-muted)" }}>
+              /{etapes.length}
+            </span>
+          </p>
+          <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+            étapes validées
+          </p>
+        </div>
       </div>
-      <p className="mb-3 text-sm" style={{ color: "var(--color-muted)" }}>
-        Cliquez sur une étape pour l&apos;ouvrir : description, date butoir,
-        statut et discussion s&apos;affichent à droite sans quitter le tableau.
-      </p>
+
+      {/* La barre d'avancement dit en un coup d'œil ce que quatre colonnes de
+          cartes obligeaient à compter à la main. */}
+      <div
+        className="mb-1 h-2 w-full overflow-hidden rounded-full"
+        style={{ background: "var(--color-surface-alt)" }}
+        role="img"
+        aria-label={`Avancement : ${avancement} %`}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${avancement}%`, background: "var(--color-success)" }}
+        />
+      </div>
+      {enRetard > 0 && (
+        <p className="mb-3 text-xs font-medium" style={{ color: "var(--color-danger)" }}>
+          {enRetard === 1
+            ? "Une étape a dépassé sa date butoir."
+            : `${enRetard} étapes ont dépassé leur date butoir.`}
+        </p>
+      )}
+      <div className="mb-4" />
 
       <div className="kanban-board">
         {STATUTS.map((statut) => {

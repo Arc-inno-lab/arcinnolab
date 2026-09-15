@@ -26,7 +26,7 @@ export function DescriptionProjet({
 
   if (!peutEditer || (!edition && !state.error)) {
     return (
-      <div className="card mb-8 p-5">
+      <div className="card p-5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Description</h2>
           {peutEditer && (
@@ -47,7 +47,7 @@ export function DescriptionProjet({
   }
 
   return (
-    <form action={action} className="card mb-8 p-5">
+    <form action={action} className="card p-5">
       <h2 className="mb-2 text-lg font-medium">Description</h2>
       <input type="hidden" name="projet_id" value={projetId} />
       <label htmlFor="description-projet" className="sr-only">

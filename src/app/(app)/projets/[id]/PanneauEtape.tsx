@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { createEtapeMessage, deleteEtape, updateEtape, updateEtapeStatut } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
 import { Avatar } from "@/components/Avatar";
+import { Tiroir } from "@/components/Tiroir";
 import {
   ETAPE_STATUT_COLORS,
   ETAPE_STATUT_LABELS,
@@ -48,16 +49,6 @@ export function PanneauEtape({
   const [erreur, setErreur] = useState<string>();
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fermer à l'Échap : dans un panneau qui recouvre la moitié de l'écran,
-  // c'est le réflexe de tout le monde.
-  useEffect(() => {
-    function surTouche(e: KeyboardEvent) {
-      if (e.key === "Escape") onFermer();
-    }
-    window.addEventListener("keydown", surTouche);
-    return () => window.removeEventListener("keydown", surTouche);
-  }, [onFermer]);
-
   function changerStatut(statut: EtapeStatut) {
     setErreur(undefined);
     const terminal = statut === "validee" || statut === "refusee";
@@ -82,37 +73,11 @@ export function PanneauEtape({
     new Date(etape.date_echeance) < new Date(new Date().toDateString());
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-black/25"
-        onClick={onFermer}
-        aria-hidden="true"
-      />
-      <aside
-        role="dialog"
-        aria-label={`Étape ${etape.titre}`}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col overflow-y-auto border-l shadow-xl"
-        style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
-      >
-        <header
-          className="sticky top-0 flex items-start justify-between gap-3 border-b px-5 py-4"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
-        >
-          <div>
-            <span
-              className="mb-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
-              style={{ background: ETAPE_STATUT_COLORS[etape.statut], color: "#fff" }}
-            >
-              {ETAPE_STATUT_LABELS[etape.statut]}
-            </span>
-            <h2 className="text-lg font-semibold">{etape.titre}</h2>
-          </div>
-          <button type="button" onClick={onFermer} className="btn btn-outline text-xs">
-            Fermer
-          </button>
-        </header>
-
-        <div className="flex flex-col gap-6 px-5 py-5">
+    <Tiroir
+      titre={etape.titre}
+      sousTitre={ETAPE_STATUT_LABELS[etape.statut]}
+      onFermer={onFermer}
+    >
           <section>
             <h3 className="mb-2 text-sm font-medium">Statut</h3>
             <div className="flex flex-wrap gap-2">
@@ -338,8 +303,6 @@ export function PanneauEtape({
               </button>
             </section>
           )}
-        </div>
-      </aside>
-    </>
+    </Tiroir>
   );
 }

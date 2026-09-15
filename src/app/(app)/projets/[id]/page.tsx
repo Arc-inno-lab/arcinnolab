@@ -2,14 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Projet, MembreProjet, EtapeProjet, MessageProjet, Invitation } from "@/lib/types";
 import { ETAT_LABELS } from "@/lib/types";
-import { InvitationForm } from "../../invitations/new/InvitationForm";
-import { CancelInvitationButton } from "../../admin/CancelInvitationButton";
 import { EtatSelect } from "./EtatSelect";
 import { KanbanEtapes } from "./KanbanEtapes";
-import { MessagesProjetSection } from "./MessagesProjetSection";
+import { FilProjet } from "./FilProjet";
 import { ProjetLogoUpload } from "./ProjetLogoUpload";
 import { DescriptionProjet } from "./DescriptionProjet";
-import { PartenairesProjet } from "./PartenairesProjet";
+import { EquipeProjet } from "./EquipeProjet";
 import { Avatar } from "@/components/Avatar";
 
 type ProjetAvecReferent = Projet & {
@@ -180,95 +178,39 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
-      <DescriptionProjet
-        projetId={projet.id}
-        description={projet.description}
-        peutEditer={peutEditer}
-      />
+      {/* Deux colonnes : le travail à gauche, la conversation à droite et
+          toujours visible. Le fil placé en bas de page obligeait à faire
+          défiler tout l'écran, et l'on perdait de vue ce dont on parlait. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <DescriptionProjet
+            projetId={projet.id}
+            description={projet.description}
+            peutEditer={peutEditer}
+          />
 
-      <section aria-labelledby="equipe-heading" className="mb-8">
-        <h2 id="equipe-heading" className="mb-3 text-lg font-medium">
-          Porteurs de projet ({membres?.length ?? 0})
-        </h2>
-        {!membres?.length && !invitationsEnAttente?.length ? (
-          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Aucun porteur rattaché pour le moment.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {membres?.map((m) => (
-              <li key={m.id} className="card flex items-center gap-3 p-3 text-sm">
-                <Avatar nom={m.profile?.nom} prenom={m.profile?.prenom} photoUrl={m.profile?.photo_url} size="sm" />
-                <div>
-                  <span className="font-medium">
-                    {m.profile?.prenom} {m.profile?.nom}
-                  </span>
-                  {" · "}
-                  <span style={{ color: "var(--color-muted)" }}>{m.profile?.email}</span>
-                  {m.profile?.organisation && (
-                    <span style={{ color: "var(--color-muted)" }}> · {m.profile.organisation}</span>
-                  )}
-                </div>
-              </li>
-            ))}
-            {invitationsEnAttente?.map((inv) => (
-              <li
-                key={inv.id}
-                className="card flex items-center justify-between gap-3 p-3 text-sm"
-                style={{ borderStyle: "dashed" }}
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar nom={inv.nom} prenom={inv.prenom} photoUrl={null} size="sm" />
-                  <div>
-                    <span className="font-medium">
-                      {inv.prenom || inv.nom ? `${inv.prenom ?? ""} ${inv.nom ?? ""}`.trim() : inv.email}
-                    </span>
-                    {" · "}
-                    <span style={{ color: "var(--color-muted)" }}>{inv.email}</span>
-                    {inv.organisation && (
-                      <span style={{ color: "var(--color-muted)" }}> · {inv.organisation}</span>
-                    )}
-                    <span className="tag ml-2" style={{ "--tag-bg": "var(--color-primary-soft)", "--tag-color": "var(--color-primary)" } as React.CSSProperties}>
-                      invitation en attente
-                    </span>
-                  </div>
-                </div>
-                {peutGerer && <CancelInvitationButton id={inv.id} />}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <EquipeProjet
+            projetId={projet.id}
+            membres={membres ?? []}
+            invitations={invitationsEnAttente ?? []}
+            referent={projet.referent}
+            partenaires={partenairesRattaches}
+            partenairesDisponibles={partenairesDisponibles}
+            peutGerer={peutGerer}
+          />
 
-      <PartenairesProjet
-        projetId={projet.id}
-        rattaches={partenairesRattaches}
-        disponibles={partenairesDisponibles}
-        referent={projet.referent}
-        peutGerer={peutGerer}
-      />
+          <KanbanEtapes
+            projetId={projet.id}
+            etapes={etapes ?? []}
+            peutEditer={peutEditer}
+            peutValider={peutGerer}
+            messagesParEtape={messagesParEtape}
+            documentsParEtape={documentsParEtape}
+          />
+        </div>
 
-      <KanbanEtapes
-        projetId={projet.id}
-        etapes={etapes ?? []}
-        peutEditer={peutEditer}
-        peutValider={peutGerer}
-        messagesParEtape={messagesParEtape}
-        documentsParEtape={documentsParEtape}
-      />
-
-      <MessagesProjetSection projetId={projet.id} messages={messages ?? []} />
-
-      {peutGerer && (
-        <section aria-labelledby="inviter-heading">
-          <h2 id="inviter-heading" className="mb-3 text-lg font-medium">
-            Inviter un porteur sur ce projet
-          </h2>
-          <div className="max-w-md">
-            <InvitationForm canInvitePartenaire={false} projetId={projet.id} />
-          </div>
-        </section>
-      )}
+        <FilProjet projetId={projet.id} messages={messages ?? []} />
+      </div>
     </div>
   );
 }
