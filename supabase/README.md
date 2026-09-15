@@ -55,3 +55,15 @@ bord Supabase sans perte de données. Le plan Free ne propose en revanche
 **aucune sauvegarde** : c'est la limite acceptée pour cette phase de
 démonstration, à revoir avant toute mise en service réelle avec des données de
 porteurs de projets.
+
+## Une migration « test » dans l'historique de la base
+
+L'historique Supabase contient une entrée `test_temporaire_ouverture_projet`
+(15/09/2026) qui n'a **pas** de fichier ici, et c'est volontaire. C'était un
+bloc `DO` de vérification du déclencheur de la migration 016 : il crée une
+demande fictive, l'admet, contrôle qu'un projet et une seule invitation sont
+bien nés, vérifie qu'une seconde admission ne produit pas de doublon, puis
+efface tout ce qu'il a créé. Il ne modifie aucune structure et n'a laissé
+aucune donnée. Il n'est pas versionné parce qu'il ne pourrait pas être rejoué
+tel quel sur une base vierge : il suppose qu'au moins un compte d'équipe
+existe.

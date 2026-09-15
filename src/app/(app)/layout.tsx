@@ -89,33 +89,45 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="md:flex md:min-h-screen">
+      {/* Le menu reste à l'écran en permanence : collé en haut sur mobile,
+          collé au bord sur grand écran. Une page longue — un kanban, un fil de
+          discussion — le faisait disparaître au défilement, et l'on se
+          retrouvait sans issue autre que le bouton « précédent ». */}
       <aside
-        className="border-b md:flex md:min-h-screen md:w-60 md:shrink-0 md:flex-col md:border-b-0 md:border-r"
+        className="sticky top-0 z-30 border-b md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"
         style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 md:flex-col md:items-start md:gap-3">
           <Link href="/" className="flex items-center gap-2">
             <Logo />
           </Link>
+        </div>
+
+        <SidebarNav items={items} />
+
+        {/* Le compte et la sortie, toujours au même endroit et toujours
+            visibles : ce sont les deux actions qu'on cherche quand on ne sait
+            plus où l'on est. */}
+        <div
+          className="flex flex-wrap items-center gap-2 border-t px-4 py-3 md:mt-auto md:flex-col md:items-stretch md:px-3"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <Link
             href="/profil"
-            className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs transition hover:bg-[var(--color-bg)] md:w-full"
+            className="flex flex-1 items-center gap-2 rounded-lg px-2 py-2 text-xs transition hover:bg-[var(--color-bg)]"
             style={{ color: "var(--color-muted)" }}
           >
             <Avatar nom={profile.nom} prenom={profile.prenom} photoUrl={profile.photo_url} size="sm" />
             <span>
               {profile.prenom} {profile.nom}
               <br />
-              <strong style={{ color: "var(--color-text)" }}>{ROLE_LABELS[profile.role]}</strong>
+              <strong style={{ color: "var(--color-text)" }}>Mon compte</strong>
+              {" · "}
+              {ROLE_LABELS[profile.role]}
             </span>
           </Link>
-        </div>
-
-        <SidebarNav items={items} />
-
-        <div className="px-4 py-3 md:mt-auto md:px-3">
-          <form action={logout}>
-            <button type="submit" className="btn btn-outline w-full md:w-auto">
+          <form action={logout} className="md:w-full">
+            <button type="submit" className="btn btn-outline w-full">
               Déconnexion
             </button>
           </form>

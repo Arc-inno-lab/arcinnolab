@@ -24,6 +24,8 @@ export default async function DashboardPage() {
 
   if (!profile) return null;
 
+  const equipe = profile.role === "admin" || profile.role === "partenaire";
+
   const [
     { count: nbProjets },
     { count: nbEtapesEnCours },
@@ -66,6 +68,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Les compteurs de population ne sont montrés qu'à l'équipe : depuis la
+          migration 016, un porteur ne voit que les personnes rattachées à ses
+          projets, et afficher « 1 partenaire » lui donnerait une image fausse
+          du consortium. */}
       <div className="kpi-grid mb-8">
         <div className="kpi-card fade-up">
           <div className="kpi-value">{nbProjets ?? 0}</div>
@@ -75,24 +81,30 @@ export default async function DashboardPage() {
           <div className="kpi-value">{nbEtapesEnCours ?? 0}</div>
           <div className="kpi-label">Étapes en cours</div>
         </div>
-        <div className="kpi-card fade-up">
-          <div className="kpi-value">{nbPartenaires ?? 0}</div>
-          <div className="kpi-label">Partenaires ArcInnoLab</div>
-        </div>
-        <div className="kpi-card fade-up">
-          <div className="kpi-value">{nbPorteurs ?? 0}</div>
-          <div className="kpi-label">Porteurs de projet</div>
-        </div>
+        {equipe && (
+          <>
+            <div className="kpi-card fade-up">
+              <div className="kpi-value">{nbPartenaires ?? 0}</div>
+              <div className="kpi-label">Partenaires ArcInnoLab</div>
+            </div>
+            <div className="kpi-card fade-up">
+              <div className="kpi-value">{nbPorteurs ?? 0}</div>
+              <div className="kpi-label">Porteurs de projet</div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mb-8 grid gap-8 lg:grid-cols-[1.4fr_1fr]">
         <section aria-labelledby="partenaires-heading">
           <h2 id="partenaires-heading" className="mb-3 text-lg font-medium">
-            L&apos;équipe ArcInnoLab
+            {equipe ? "L'équipe ArcInnoLab" : "Vos interlocuteurs"}
           </h2>
           {!partenaires?.length ? (
             <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-              Personne d&apos;autre pour le moment.
+              {equipe
+                ? "Personne d'autre pour le moment."
+                : "Aucun interlocuteur rattaché à vos projets pour l'instant. Votre référent apparaîtra ici."}
             </p>
           ) : (
             <div className="partner-directory">

@@ -58,6 +58,11 @@ export interface EtapeProjet {
   avis: string | null;
   id_partenaire_validateur: string | null;
   date_validation: string | null;
+  // Ajoutés en migration 016 : une colonne et un titre ne suffisent pas à
+  // piloter un jalon, il faut pouvoir dire de quoi il s'agit et pour quand.
+  description: string | null;
+  date_echeance: string | null;
+  updated_at: string;
 }
 
 export const ETAPE_STATUT_LABELS: Record<EtapeStatut, string> = {
@@ -121,7 +126,10 @@ export type NotificationType =
   // moyen d'apprendre qu'un avis lui est demandé (cf. migration 015).
   | "tour_vote"
   // Message écrit par un porteur depuis sa page de suivi.
-  | "message_demande";
+  | "message_demande"
+  // Ouverture automatique d'un projet à l'admission d'une candidature
+  // (cf. migration 016).
+  | "projet";
 
 export interface AppNotification {
   id: string;

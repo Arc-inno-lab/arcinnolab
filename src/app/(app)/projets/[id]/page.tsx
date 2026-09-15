@@ -8,6 +8,8 @@ import { EtatSelect } from "./EtatSelect";
 import { KanbanEtapes } from "./KanbanEtapes";
 import { MessagesProjetSection } from "./MessagesProjetSection";
 import { ProjetLogoUpload } from "./ProjetLogoUpload";
+import { DescriptionProjet } from "./DescriptionProjet";
+import { PartenairesProjet } from "./PartenairesProjet";
 import { Avatar } from "@/components/Avatar";
 
 type ProjetAvecReferent = Projet & {
@@ -40,6 +42,8 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     { data: etapeMessages },
     { data: etapeDocuments },
     { data: invitationsEnAttente },
+    { data: liens },
+    { data: tousPartenaires },
   ] = await Promise.all([
     supabase
       .from("membres_projet")
@@ -59,7 +63,16 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       .is("etape_id", null)
       .order("created_at", { ascending: true })
       .returns<MessageProjet[]>(),
-    supabase.from("messages_projet").select("etape_id").eq("projet_id", id).not("etape_id", "is", null),
+    // Les messages d'étape sont chargés en entier : le panneau latéral les
+    // affiche sans changer de page, il ne peut donc plus se contenter d'un
+    // décompte.
+    supabase
+      .from("messages_projet")
+      .select("*, auteur:profiles(nom,prenom,role,photo_url)")
+      .eq("projet_id", id)
+      .not("etape_id", "is", null)
+      .order("created_at", { ascending: true })
+      .returns<MessageProjet[]>(),
     supabase.from("documents").select("etape_id").eq("projet_id", id).not("etape_id", "is", null),
     supabase
       .from("invitations")
@@ -67,31 +80,63 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       .eq("projet_id", id)
       .eq("statut", "en_attente")
       .returns<Invitation[]>(),
+    supabase
+      .from("projet_partenaire")
+      .select("partenaire_id, profile:profiles(id,nom,prenom,email,organisation,photo_url,role)")
+      .eq("projet_id", id)
+      .returns<{ partenaire_id: string; profile: Profile | null }[]>(),
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "partenaire")
+      .order("nom", { ascending: true })
+      .returns<Profile[]>(),
   ]);
 
   if (!profile) redirect("/login");
 
-  const isReferent = profile.id === projet.id_partenaire_createur;
-  const isAdmin = profile.role === "admin";
-  const peutGerer = isReferent || isAdmin;
+  const partenairesRattaches = (liens ?? [])
+    .map((l) => l.profile)
+    .filter((p): p is Profile => Boolean(p));
 
-  const counts: Record<string, { messages: number; documents: number }> = {};
-  for (const m of etapeMessages ?? []) {
-    if (!m.etape_id) continue;
-    counts[m.etape_id] ??= { messages: 0, documents: 0 };
-    counts[m.etape_id].messages += 1;
-  }
+  const isAdmin = profile.role === "admin";
+  // Référent au sens de la base : le créateur, mais aussi tout partenaire
+  // rattaché au projet (cf. is_project_referent, migration 001).
+  const isReferent =
+    profile.id === projet.id_partenaire_createur ||
+    partenairesRattaches.some((p) => p.id === profile.id);
+  const estMembre = (membres ?? []).some((m) => m.user_id === profile.id);
+
+  // Deux droits distincts, et c'est tout l'enjeu : le porteur mène son projet
+  // (descriptif, logo, étapes, dates), le partenaire garde la validation et
+  // l'état du projet. Confondre les deux, c'est soit river le porteur à un
+  // écran en lecture seule, soit lui laisser valider ses propres jalons.
+  const peutGerer = isReferent || isAdmin;
+  const peutEditer = peutGerer || estMembre;
+
+  const documentsParEtape: Record<string, number> = {};
   for (const d of etapeDocuments ?? []) {
     if (!d.etape_id) continue;
-    counts[d.etape_id] ??= { messages: 0, documents: 0 };
-    counts[d.etape_id].documents += 1;
+    documentsParEtape[d.etape_id] = (documentsParEtape[d.etape_id] ?? 0) + 1;
   }
+
+  const messagesParEtape: Record<string, MessageProjet[]> = {};
+  for (const m of etapeMessages ?? []) {
+    if (!m.etape_id) continue;
+    (messagesParEtape[m.etape_id] ??= []).push(m);
+  }
+
+  const dejaRattaches = new Set([
+    projet.id_partenaire_createur,
+    ...partenairesRattaches.map((p) => p.id),
+  ]);
+  const partenairesDisponibles = (tousPartenaires ?? []).filter((p) => !dejaRattaches.has(p.id));
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          {peutGerer ? (
+          {peutEditer ? (
             <ProjetLogoUpload projetId={projet.id} logoUrl={projet.logo_url} titre={projet.titre} />
           ) : (
             <span
@@ -135,12 +180,11 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
-      {projet.description && (
-        <div className="card mb-8 p-5">
-          <h2 className="mb-2 text-lg font-medium">Description</h2>
-          <p className="text-sm whitespace-pre-wrap">{projet.description}</p>
-        </div>
-      )}
+      <DescriptionProjet
+        projetId={projet.id}
+        description={projet.description}
+        peutEditer={peutEditer}
+      />
 
       <section aria-labelledby="equipe-heading" className="mb-8">
         <h2 id="equipe-heading" className="mb-3 text-lg font-medium">
@@ -196,7 +240,22 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
         )}
       </section>
 
-      <KanbanEtapes projetId={projet.id} etapes={etapes ?? []} peutGerer={peutGerer} counts={counts} />
+      <PartenairesProjet
+        projetId={projet.id}
+        rattaches={partenairesRattaches}
+        disponibles={partenairesDisponibles}
+        referent={projet.referent}
+        peutGerer={peutGerer}
+      />
+
+      <KanbanEtapes
+        projetId={projet.id}
+        etapes={etapes ?? []}
+        peutEditer={peutEditer}
+        peutValider={peutGerer}
+        messagesParEtape={messagesParEtape}
+        documentsParEtape={documentsParEtape}
+      />
 
       <MessagesProjetSection projetId={projet.id} messages={messages ?? []} />
 

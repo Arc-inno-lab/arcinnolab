@@ -1,33 +1,58 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
 import { createEtape, updateEtapeStatut } from "@/app/actions";
-import { ETAPE_STATUT_LABELS, ETAPE_STATUT_COLORS, type EtapeProjet, type EtapeStatut } from "@/lib/types";
+import {
+  ETAPE_STATUT_LABELS,
+  ETAPE_STATUT_COLORS,
+  type EtapeProjet,
+  type EtapeStatut,
+  type MessageProjet,
+} from "@/lib/types";
+import { PanneauEtape } from "./PanneauEtape";
 
 const STATUTS: EtapeStatut[] = ["a_faire", "en_cours", "validee", "refusee"];
-const STATUT_SHORT: Record<EtapeStatut, string> = {
-  a_faire: "À",
-  en_cours: "En",
-  validee: "Val",
-  refusee: "Ref",
-};
 
+/**
+ * Le tableau des étapes.
+ *
+ * Cliquer sur une carte n'emmène plus sur une autre page : un panneau s'ouvre
+ * à droite, le tableau reste visible derrière. C'est la différence entre
+ * consulter une liste de fiches et piloter un plan de travail.
+ *
+ * Le glisser-déposer, lui, est réservé aux colonnes que la personne a le droit
+ * de choisir : un porteur mène son travail entre « À faire » et « En cours »,
+ * la validation reste l'avis du partenaire référent (la base le vérifie aussi,
+ * cf. migration 016).
+ */
 export function KanbanEtapes({
   projetId,
   etapes,
-  peutGerer,
-  counts,
+  peutEditer,
+  peutValider,
+  messagesParEtape,
+  documentsParEtape,
 }: {
   projetId: string;
   etapes: EtapeProjet[];
-  peutGerer: boolean;
-  counts: Record<string, { messages: number; documents: number }>;
+  peutEditer: boolean;
+  peutValider: boolean;
+  messagesParEtape: Record<string, MessageProjet[]>;
+  documentsParEtape: Record<string, number>;
 }) {
   const [pending, startTransition] = useTransition();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<EtapeStatut | null>(null);
+  const [ouverteId, setOuverteId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const ouverte = etapes.find((e) => e.id === ouverteId) ?? null;
+
+  function colonneAutorisee(statut: EtapeStatut) {
+    if (!peutEditer) return false;
+    if (statut === "validee" || statut === "refusee") return peutValider;
+    return true;
+  }
 
   function ajouter(e: React.FormEvent) {
     e.preventDefault();
@@ -43,21 +68,26 @@ export function KanbanEtapes({
 
   return (
     <section aria-labelledby="etapes-heading" className="mb-8">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 id="etapes-heading" className="text-lg font-medium">
           Passeport projet — étapes ({etapes.length})
         </h2>
       </div>
+      <p className="mb-3 text-sm" style={{ color: "var(--color-muted)" }}>
+        Cliquez sur une étape pour l&apos;ouvrir : description, date butoir,
+        statut et discussion s&apos;affichent à droite sans quitter le tableau.
+      </p>
 
       <div className="kanban-board">
         {STATUTS.map((statut) => {
-          const cardsInColumn = etapes.filter((e) => e.statut === statut);
+          const cartes = etapes.filter((e) => e.statut === statut);
+          const accepte = colonneAutorisee(statut);
           return (
             <div
               key={statut}
               className={`kanban-column${overColumn === statut ? " is-dragover" : ""}`}
               onDragOver={(e) => {
-                if (!peutGerer) return;
+                if (!accepte) return;
                 e.preventDefault();
                 setOverColumn(statut);
               }}
@@ -65,21 +95,30 @@ export function KanbanEtapes({
               onDrop={(e) => {
                 e.preventDefault();
                 setOverColumn(null);
+                if (!accepte) return;
                 const etapeId = e.dataTransfer.getData("text/plain");
                 if (etapeId) deplacer(etapeId, statut);
               }}
             >
               <div className="kanban-column-title" style={{ color: ETAPE_STATUT_COLORS[statut] }}>
-                <span aria-hidden="true">●</span> {ETAPE_STATUT_LABELS[statut]} ({cardsInColumn.length})
+                <span aria-hidden="true">●</span> {ETAPE_STATUT_LABELS[statut]} ({cartes.length})
               </div>
 
-              {cardsInColumn.map((etape) => {
-                const c = counts[etape.id] ?? { messages: 0, documents: 0 };
+              {cartes.map((etape) => {
+                const nbMessages = messagesParEtape[etape.id]?.length ?? 0;
+                const nbDocs = documentsParEtape[etape.id] ?? 0;
+                const deplacable =
+                  peutEditer && (peutValider || (statut !== "validee" && statut !== "refusee"));
+                const retard =
+                  etape.date_echeance &&
+                  etape.statut !== "validee" &&
+                  new Date(etape.date_echeance) < new Date(new Date().toDateString());
+
                 return (
                   <article
                     key={etape.id}
                     className={`kanban-card${draggingId === etape.id ? " is-dragging" : ""}`}
-                    draggable={peutGerer}
+                    draggable={deplacable}
                     onDragStart={(e) => {
                       setDraggingId(etape.id);
                       e.dataTransfer.setData("text/plain", etape.id);
@@ -87,47 +126,42 @@ export function KanbanEtapes({
                     }}
                     onDragEnd={() => setDraggingId(null)}
                   >
-                    <Link
-                      href={`/projets/${projetId}/etapes/${etape.id}`}
-                      className="font-medium hover:underline"
+                    <button
+                      type="button"
+                      onClick={() => setOuverteId(etape.id)}
+                      className="block w-full text-left font-medium hover:underline"
                     >
                       {etape.titre}
-                    </Link>
+                    </button>
 
-                    {etape.avis && (
+                    {etape.description && (
                       <p className="mt-1 line-clamp-2 text-xs" style={{ color: "var(--color-muted)" }}>
-                        Avis : {etape.avis}
+                        {etape.description}
+                      </p>
+                    )}
+
+                    {etape.date_echeance && (
+                      <p
+                        className="mt-1 text-xs font-medium"
+                        style={{ color: retard ? "var(--color-danger)" : "var(--color-muted)" }}
+                      >
+                        {retard ? "En retard — " : "Pour le "}
+                        {new Date(etape.date_echeance).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "short",
+                        })}
                       </p>
                     )}
 
                     <div className="kanban-card-meta">
-                      <span>💬 {c.messages}</span>
-                      <span>📎 {c.documents}</span>
+                      <span>💬 {nbMessages}</span>
+                      <span>📎 {nbDocs}</span>
                     </div>
-
-                    {peutGerer && (
-                      <div className="pill-group mt-2" role="group" aria-label={`Changer le statut de ${etape.titre}`}>
-                        {STATUTS.map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            disabled={pending || s === etape.statut}
-                            aria-pressed={s === etape.statut}
-                            aria-label={`Marquer « ${etape.titre} » comme ${ETAPE_STATUT_LABELS[s]}`}
-                            onClick={() => deplacer(etape.id, s)}
-                            className="pill"
-                            style={{ "--pill-color": ETAPE_STATUT_COLORS[s], minHeight: "1.75rem", padding: "0.2rem 0.55rem" } as React.CSSProperties}
-                          >
-                            {STATUT_SHORT[s]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </article>
                 );
               })}
 
-              {!cardsInColumn.length && (
+              {!cartes.length && (
                 <p className="px-1 text-xs" style={{ color: "var(--color-muted)" }}>
                   Aucune étape.
                 </p>
@@ -137,7 +171,7 @@ export function KanbanEtapes({
         })}
       </div>
 
-      {peutGerer && (
+      {peutEditer && (
         <form onSubmit={ajouter} className="mt-3 flex flex-wrap gap-2">
           <label htmlFor="nouvelle-etape" className="sr-only">
             Nouvelle étape
@@ -153,6 +187,18 @@ export function KanbanEtapes({
             + Ajouter
           </button>
         </form>
+      )}
+
+      {ouverte && (
+        <PanneauEtape
+          etape={ouverte}
+          projetId={projetId}
+          messages={messagesParEtape[ouverte.id] ?? []}
+          nbDocuments={documentsParEtape[ouverte.id] ?? 0}
+          peutEditer={peutEditer}
+          peutValider={peutValider}
+          onFermer={() => setOuverteId(null)}
+        />
       )}
     </section>
   );

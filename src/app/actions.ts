@@ -1027,3 +1027,113 @@ export async function changerRole(_prev: ActionResult, formData: FormData): Prom
   revalidatePath("/admin");
   return { success: true };
 }
+
+// ------------------------------------------------------------------
+// Fiche d'étape : titre, description, échéance.
+//
+// Ouvert au porteur autant qu'au référent (RLS etapes_projet_update, migration
+// 016). Ce qui reste fermé, c'est la validation : un trigger refuse à
+// quiconque n'est pas référent de faire passer une étape en « validée » ou
+// « refusée ». Sans ce partage, le plan de travail du porteur restait la
+// propriété de son accompagnateur, et chaque date à corriger passait par lui.
+// ------------------------------------------------------------------
+export async function updateEtape(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const projetId = String(formData.get("projet_id") || "");
+  const etapeId = String(formData.get("etape_id") || "");
+  const titre = String(formData.get("titre") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+  const echeance = String(formData.get("date_echeance") || "").trim();
+
+  if (!projetId || !etapeId) return { error: "Étape introuvable." };
+  if (titre.length < 2) return { error: "Donnez un titre à cette étape." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("etapes_projet")
+    .update({
+      titre,
+      description: description || null,
+      date_echeance: echeance || null,
+    })
+    .eq("id", etapeId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/projets/${projetId}`);
+  revalidatePath(`/projets/${projetId}/etapes/${etapeId}`);
+  return { success: true };
+}
+
+/** Suppression d'une étape. La RLS refuse celles déjà tranchées au porteur. */
+export async function deleteEtape(projetId: string, etapeId: string): Promise<void> {
+  const supabase = await createServerClient();
+  await supabase.from("etapes_projet").delete().eq("id", etapeId);
+  revalidatePath(`/projets/${projetId}`);
+}
+
+/**
+ * Descriptif du projet, modifiable par le porteur comme par le référent.
+ * C'est son projet : il est le mieux placé pour le raconter, et un descriptif
+ * qu'il ne peut pas corriger vieillit sans que personne s'en aperçoive.
+ */
+export async function updateProjetDescription(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const projetId = String(formData.get("projet_id") || "");
+  const description = String(formData.get("description") || "").trim();
+  if (!projetId) return { error: "Projet introuvable." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("projets")
+    .update({ description: description || null })
+    .eq("id", projetId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/projets/${projetId}`);
+  return { success: true };
+}
+
+/**
+ * Rattachement d'un partenaire à un projet.
+ *
+ * Ce rattachement n'est pas décoratif : depuis la migration 016, c'est lui qui
+ * décide qui le porteur voit et à qui il peut écrire. Rattacher tout le
+ * consortium à chaque projet reviendrait à rouvrir l'annuaire.
+ */
+export async function rattacherPartenaire(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const projetId = String(formData.get("projet_id") || "");
+  const partenaireId = String(formData.get("partenaire_id") || "");
+  if (!projetId || !partenaireId) return { error: "Sélectionnez un partenaire." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("projet_partenaire")
+    .insert({ projet_id: projetId, partenaire_id: partenaireId });
+
+  if (error) {
+    return {
+      error: error.code === "23505"
+        ? "Ce partenaire est déjà rattaché au projet."
+        : "Rattachement impossible : " + error.message,
+    };
+  }
+
+  revalidatePath(`/projets/${projetId}`);
+  return { success: true };
+}
+
+export async function detacherPartenaire(projetId: string, partenaireId: string): Promise<void> {
+  const supabase = await createServerClient();
+  await supabase
+    .from("projet_partenaire")
+    .delete()
+    .eq("projet_id", projetId)
+    .eq("partenaire_id", partenaireId);
+  revalidatePath(`/projets/${projetId}`);
+}
