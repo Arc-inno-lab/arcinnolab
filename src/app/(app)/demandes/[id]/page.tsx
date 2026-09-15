@@ -98,11 +98,13 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
   const tourClos = tour && tour.statut === "clos";
   const decisionPrononcee = demande.statut === "admise" || demande.statut === "non_retenue";
 
-  // L'instruction n'a de sens qu'une fois la candidature versée à une promotion.
-  const candidature =
-    demande.statut === "en_attente_comite" ||
-    demande.statut === "en_instruction" ||
-    decisionPrononcee;
+  // La consultation des partenaires est ouverte dès qu'un coach suit le
+  // dossier. Elle a d'abord été conditionnée au versement préalable dans une
+  // promotion : le résultat était une fonctionnalité invisible, enterrée
+  // derrière deux étapes que rien n'annonçait à l'écran. Consulter ses pairs
+  // sur un dossier n'a pas à dépendre de l'existence d'une promotion — le
+  // rattachement, lui, reste possible et utile, mais après coup.
+  const decisionPossible = demande.statut === "en_instruction" || decisionPrononcee;
 
   const deposee = new Date(demande.created_at);
   const maintenant = instantCourant();
@@ -133,6 +135,45 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
         </span>
       </div>
 
+      {/* Fil conducteur. Il existe parce que les actions disponibles dépendent
+          de l'étape en cours : sans ce repère, une fonctionnalité qui n'est pas
+          encore accessible passe pour une fonctionnalité absente. */}
+      <ol className="mb-6 flex flex-wrap gap-2" aria-label="Étapes du traitement">
+        {(
+          [
+            { cle: "prise", label: "Prise en charge", fait: !!demande.coach_id },
+            { cle: "qualif", label: "Qualification", fait: !!demande.persona },
+            {
+              cle: "instruction",
+              label: "Consultation des partenaires",
+              fait: !!tour,
+              encours: !!tourOuvert,
+            },
+            {
+              cle: "decision",
+              label: "Décision",
+              fait: decisionPrononcee,
+              encours: !!tourClos && !decisionPrononcee,
+            },
+          ] as Array<{ cle: string; label: string; fait: boolean; encours?: boolean }>
+        ).map((e) => (
+          <li
+            key={e.cle}
+            className="rounded-full px-3 py-1 text-xs font-medium"
+            style={
+              e.encours
+                ? { background: "var(--color-primary)", color: "#fff" }
+                : e.fait
+                ? { background: "var(--color-success)", color: "#fff" }
+                : { background: "var(--color-surface-alt)", color: "var(--color-muted)" }
+            }
+          >
+            {e.fait && !e.encours ? "✓ " : ""}
+            {e.label}
+          </li>
+        ))}
+      </ol>
+
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-5">
           <section className="card p-5">
@@ -155,16 +196,17 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
               <FormQualification demande={demande} />
               <FormOrientation demandeId={demande.id} orientations={orientations ?? []} />
 
-              {!candidature && (
+              {!decisionPossible && (
                 <FormPromotion demandeId={demande.id} promotions={promotions ?? []} />
               )}
 
               {/* Instruction collégiale : consultation, puis décision. */}
-              {candidature && !tour && !decisionPrononcee && (
+              {!tour && !decisionPrononcee && (
                 <OuvrirTour
                   demandeId={demande.id}
                   promotionId={demande.promotion_id}
                   votantsAttendus={votantsAttendus ?? 1}
+                  promotions={promotions ?? []}
                 />
               )}
 
@@ -196,7 +238,9 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                 </section>
               )}
 
-              {!candidature && <FormDecision demandeId={demande.id} statut={demande.statut} />}
+              {!decisionPossible && (
+                <FormDecision demandeId={demande.id} statut={demande.statut} />
+              )}
             </>
           )}
         </div>

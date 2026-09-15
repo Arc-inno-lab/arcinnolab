@@ -18,10 +18,12 @@ export function OuvrirTour({
   demandeId,
   promotionId,
   votantsAttendus,
+  promotions,
 }: {
   demandeId: string;
   promotionId: string | null;
   votantsAttendus: number;
+  promotions: Promotion[];
 }) {
   const [state, action, pending] = useActionState(ouvrirTourVote, {});
 
@@ -41,15 +43,47 @@ export function OuvrirTour({
           style={{ background: "var(--color-surface-alt)" }}
         >
           Un seul compte peut voter aujourd&apos;hui. Invitez les partenaires du
-          consortium pour que la consultation ait du sens.
+          consortium depuis <strong>Inviter</strong> pour que la consultation ait
+          du sens — mais vous pouvez déjà l&apos;ouvrir pour essayer.
         </p>
       )}
 
       <input type="hidden" name="demande_id" value={demandeId} />
-      <input type="hidden" name="promotion_id" value={promotionId ?? ""} />
+
+      {promotions.length > 0 && (
+        <>
+          <label htmlFor="promotion_id" className="mb-1 block text-sm font-medium">
+            Rattacher à une promotion
+          </label>
+          <select
+            id="promotion_id"
+            name="promotion_id"
+            defaultValue={promotionId ?? ""}
+            className={champ}
+            style={bordure}
+          >
+            <option value="">Sans promotion pour l&apos;instant</option>
+            {promotions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nom}
+                {p.date_comite
+                  ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR")}`
+                  : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mb-4 mt-1 text-xs" style={{ color: "var(--color-muted)" }}>
+            Facultatif : le rattachement peut se faire après la consultation.
+          </p>
+        </>
+      )}
+
+      {promotions.length === 0 && (
+        <input type="hidden" name="promotion_id" value="" />
+      )}
 
       <FieldError message={state.error} />
-      <button type="submit" disabled={pending} className="btn btn-primary">
+      <button type="submit" disabled={pending} className="btn btn-primary mt-2">
         {pending ? "…" : "Ouvrir la consultation"}
       </button>
     </form>
