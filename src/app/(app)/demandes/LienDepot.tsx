@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import QRCode from "qrcode";
 
 /**
  * Le lien public de dépôt, toujours sous la main : à coller dans un e-mail,
@@ -20,6 +21,17 @@ export function LienDepot({ lien }: { lien: string }) {
     }
   }
 
+  // Les affiches imprimées pointaient vers un formulaire extérieur : ce QR
+  // code-ci mène droit à la page de dépôt, et les demandes arrivent dans la
+  // plateforme.
+  async function telechargerQr() {
+    const url = await QRCode.toDataURL(lien, { width: 1024, margin: 2, color: { dark: "#183d7a", light: "#ffffff" } });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "qr-depot-arcinnolab.png";
+    a.click();
+  }
+
   return (
     <section className="card flex max-w-full flex-wrap items-center gap-3 px-4 py-3" aria-label="Lien de dépôt des nouveaux projets">
       <div className="min-w-0">
@@ -33,6 +45,9 @@ export function LienDepot({ lien }: { lien: string }) {
       <div className="flex gap-2">
         <button type="button" onClick={copier} className="btn btn-primary text-xs" style={{ minHeight: 36 }}>
           {copie ? "Lien copié" : "Copier"}
+        </button>
+        <button type="button" onClick={telechargerQr} className="btn btn-outline text-xs" style={{ minHeight: 36 }}>
+          QR code
         </button>
         <a href={lien} target="_blank" rel="noopener noreferrer" className="btn btn-outline text-xs" style={{ minHeight: 36 }}>
           Ouvrir

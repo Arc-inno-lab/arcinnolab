@@ -116,7 +116,7 @@ export function DemandeForm() {
       setRecap(Object.fromEntries(Array.from(fd.entries()).map(([k, v]) => [k, String(v)])));
     }
     setEtape((e) => Math.min(e + 1, 2));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.getElementById("deposer")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function envoyer(e: React.FormEvent<HTMLFormElement>) {
