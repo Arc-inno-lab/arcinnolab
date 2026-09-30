@@ -6,6 +6,8 @@ import { Avatar } from "@/components/Avatar";
 import { InterregMention } from "@/components/InterregFooter";
 import { Logo } from "@/components/Logo";
 import { SidebarNav, type NavItem } from "@/components/SidebarNav";
+import { BarrePorteur } from "@/components/BarrePorteur";
+import { chargerAFaire } from "@/lib/a-faire";
 import { ROLE_LABELS, type Profile } from "@/lib/types";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -21,93 +23,52 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile) redirect("/login");
 
-  const equipe = profile.role === "admin" || profile.role === "partenaire";
+  const porteur = profile.role === "porteur";
 
-  const [{ count: unreadCount }, { count: unreadDm }, { count: demandesEnAttente }] =
-    await Promise.all([
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("lu", false),
-      supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("destinataire_id", user.id)
-        .eq("lu", false),
-      // Seules les demandes que personne n'a encore prises en charge font
-      // l'objet d'un badge : c'est l'absence de réponse qui doit alerter, pas
-      // le volume de travail en cours.
-      equipe
-        ? supabase
-            .from("demandes_accueil")
-            .select("id", { count: "exact", head: true })
-            .eq("statut", "nouvelle")
-        : Promise.resolve({ count: 0 }),
-    ]);
+  const { count: messagesNonLus } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("destinataire_id", user.id)
+    .eq("lu", false);
 
-  // Les consultations ouvertes où cette personne n'a pas encore voté comptent
-  // aussi : un avis attendu est une demande adressée à elle personnellement,
-  // plus pressante encore qu'une demande dans la file commune.
-  let avisAttendus = 0;
-  if (equipe) {
-    const [{ data: tours }, { data: votes }] = await Promise.all([
-      supabase
-        .from("tours_vote")
-        .select("id")
-        .eq("statut", "en_cours")
-        .returns<{ id: string }[]>(),
-      supabase
-        .from("votes")
-        .select("tour_id")
-        .eq("votant_id", user.id)
-        .returns<{ tour_id: string }[]>(),
-    ]);
-    const votes_ = new Set((votes ?? []).map((v) => v.tour_id));
-    avisAttendus = (tours ?? []).filter((t) => !votes_.has(t.id)).length;
-  }
-
-  const items: NavItem[] = [
-    { href: "/", label: "Accueil" },
-    { href: "/projets", label: "Projets" },
-    { href: "/messages", label: "Messages", badge: unreadDm ?? 0 },
-    { href: "/notifications", label: "Notifications", badge: unreadCount ?? 0 },
-  ];
-  if (equipe) {
-    // Placée juste après Accueil : la file des porteurs qui attendent une
-    // réponse passe avant le suivi des projets déjà accompagnés.
-    items.splice(1, 0, {
-      href: "/demandes",
-      label: "Demandes",
-      badge: (demandesEnAttente ?? 0) + avisAttendus,
-    });
-    items.push({ href: "/invitations/new", label: "Inviter" });
-  }
-  if (profile.role === "admin") {
-    items.push({ href: "/admin", label: "Back-office" });
+  // Le menu est taillé pour chaque rôle. Un porteur n'a que deux lieux : son
+  // projet et sa conversation avec l'équipe. L'équipe arrive sur ce qui attend
+  // son action ; les notifications y sont intégrées plutôt que rangées à part,
+  // et « Inviter » — un geste, pas un lieu — rejoint l'administration.
+  let items: NavItem[];
+  if (porteur) {
+    items = [
+      { href: "/mon-projet", label: "Mon projet", exact: true },
+      { href: "/mon-projet/messages", label: "Messages" },
+    ];
+  } else {
+    const aFaire = await chargerAFaire(supabase, user.id, profile.role);
+    items = [
+      { href: "/", label: "À faire", badge: aFaire.total, badgeFort: true },
+      { href: "/demandes", label: "Demandes" },
+      { href: "/projets", label: "Projets" },
+      { href: "/messages", label: "Messages", badge: messagesNonLus ?? 0 },
+    ];
+    if (profile.role === "admin") items.push({ href: "/admin", label: "Administration" });
   }
 
   return (
     <div className="md:flex md:min-h-screen">
       {/* Le menu reste à l'écran en permanence : collé en haut sur mobile,
-          collé au bord sur grand écran. Une page longue — un kanban, un fil de
-          discussion — le faisait disparaître au défilement, et l'on se
-          retrouvait sans issue autre que le bouton « précédent ». */}
+          collé au bord sur grand écran. Pour le porteur, sur téléphone, il
+          devient une barre d'onglets en bas de l'écran, là où le pouce va. */}
       <aside
-        className="sticky top-0 z-30 border-b md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"
+        className={`sticky top-0 z-30 border-b md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r ${porteur ? "max-md:hidden" : ""}`}
         style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 md:flex-col md:items-start md:gap-3">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={porteur ? "/mon-projet" : "/"} className="flex items-center gap-2">
             <Logo />
           </Link>
         </div>
 
-        <SidebarNav items={items} />
+        <SidebarNav items={items} grand={porteur} />
 
-        {/* Le compte et la sortie, toujours au même endroit et toujours
-            visibles : ce sont les deux actions qu'on cherche quand on ne sait
-            plus où l'on est. */}
         <div
           className="flex flex-wrap items-center gap-2 border-t px-4 py-3 md:mt-auto md:flex-col md:items-stretch md:px-3"
           style={{ borderColor: "var(--color-border)" }}
@@ -119,11 +80,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           >
             <Avatar nom={profile.nom} prenom={profile.prenom} photoUrl={profile.photo_url} size="sm" />
             <span>
-              {profile.prenom} {profile.nom}
-              <br />
               <strong style={{ color: "var(--color-text)" }}>Mon compte</strong>
-              {" · "}
-              {ROLE_LABELS[profile.role]}
+              <br />
+              {profile.prenom} {profile.nom}
+              {porteur ? "" : ` · ${ROLE_LABELS[profile.role]}`}
             </span>
           </Link>
           <form action={logout} className="md:w-full">
@@ -133,10 +93,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <main id="main" className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">
+
+      {porteur && (
+        <header
+          className="sticky top-0 z-30 flex items-center justify-between border-b px-5 py-3 md:hidden"
+          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        >
+          <Link href="/mon-projet" aria-label="Mon projet">
+            <Logo compact />
+          </Link>
+          <Link href="/profil" aria-label="Mon compte">
+            <Avatar nom={profile.nom} prenom={profile.prenom} photoUrl={profile.photo_url} size="sm" />
+          </Link>
+        </header>
+      )}
+
+      <main
+        id="main"
+        className={`mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 ${porteur ? "max-md:pb-28 max-md:pt-5" : ""}`}
+      >
         <div className="flex-1">{children}</div>
         <InterregMention />
       </main>
+
+      {porteur && <BarrePorteur />}
     </div>
   );
 }

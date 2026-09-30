@@ -1,92 +1,101 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { posterMessageSuivi } from "@/app/actions";
-import { FieldError } from "@/components/FieldError";
 import type { MessageSuivi } from "@/lib/types";
 
+function quand(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /**
- * Le fil d'échange vu du porteur.
- *
- * Il n'a pas de compte : c'est son lien de suivi qui l'identifie. Sans ce fil,
- * la page lui annonçait « nous revenons vers vous » sans lui laisser le moindre
- * moyen de poser une question — la promesse du manifeste tenait alors du
- * slogan.
+ * Le fil d'échange vu du porteur, sans compte : son lien de suivi
+ * l'identifie. Ses messages à droite, ceux de l'équipe à gauche avec le
+ * prénom de qui a répondu — on parle à quelqu'un, pas à un guichet.
  */
 export function EchangePorteur({
   token,
   messages,
+  coach,
 }: {
   token: string;
   messages: MessageSuivi[];
+  coach: string | null;
 }) {
   const [state, action, pending] = useActionState(posterMessageSuivi, {});
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.success) formRef.current?.reset();
+  }, [state]);
 
   return (
-    <section className="card mb-5 p-6">
-      <h2 className="mb-1 text-lg font-medium">Échanger avec l&apos;équipe</h2>
-      <p className="mb-4 text-sm" style={{ color: "var(--color-muted)" }}>
-        Posez vos questions ici. Vos messages arrivent directement à
-        l&apos;équipe ArcInnoLab, et leurs réponses s&apos;affichent sur cette
-        page.
-      </p>
+    <section className="mb-6" aria-labelledby="echanges">
+      <h2 id="echanges" className="mb-3 text-[20px] font-bold">
+        Vos échanges avec {coach ?? "l'équipe"}
+      </h2>
 
-      {messages.length > 0 && (
-        <ul className="mb-5 flex flex-col gap-3">
+      {messages.length > 0 ? (
+        <ul className="mb-4 flex flex-col gap-3">
           {messages.map((m, i) => {
             const equipe = m.auteur === "equipe";
             return (
-              <li
-                key={i}
-                className="rounded-md p-3"
-                style={{
-                  background: equipe ? "var(--color-surface-alt)" : "var(--color-surface)",
-                  border: equipe ? "none" : "1px solid var(--color-border)",
-                }}
-              >
+              <li key={i} className={`flex flex-col gap-1 ${equipe ? "items-start" : "items-end"}`}>
                 <p
-                  className="mb-1 text-xs font-medium"
-                  style={{ color: "var(--color-muted)" }}
+                  className="max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-[17px] leading-snug"
+                  style={
+                    equipe
+                      ? { background: "var(--color-surface)", border: "1px solid var(--color-border)", borderBottomLeftRadius: 6 }
+                      : { background: "var(--color-primary)", color: "#fff", borderBottomRightRadius: 6 }
+                  }
                 >
-                  {equipe ? "Équipe ArcInnoLab" : "Vous"}
-                  {" · "}
-                  {new Date(m.envoye_le).toLocaleString("fr-FR", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {m.contenu}
                 </p>
-                <p className="whitespace-pre-wrap text-sm">{m.contenu}</p>
+                <span className="text-sm" style={{ color: "var(--color-muted)" }}>
+                  {equipe ? (m.auteur_prenom ?? "L'équipe") : "Vous"} · {quand(m.envoye_le)}
+                </span>
               </li>
             );
           })}
         </ul>
-      )}
-
-      {state.success && (
-        <p className="mb-3 text-sm" style={{ color: "var(--color-success)" }} role="status">
-          Message envoyé. Rechargez la page pour le voir apparaître.
+      ) : (
+        <p className="mb-4" style={{ color: "var(--color-muted)" }}>
+          Une question ? Écrivez ici : {coach ?? "l'équipe"} vous répond sur cette page.
         </p>
       )}
 
-      <form action={action}>
+      <form ref={formRef} action={action}>
         <input type="hidden" name="token" value={token} />
-        <label htmlFor="contenu" className="mb-1 block text-sm font-medium">
+        <label htmlFor="contenu" className="sr-only">
           Votre message
         </label>
         <textarea
           id="contenu"
           name="contenu"
-          rows={4}
+          rows={3}
           required
-          placeholder="Une question, une précision sur votre projet, une disponibilité…"
-          className="w-full rounded-md border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--color-border)" }}
+          placeholder="Écrivez votre réponse ici…"
+          className="champ-grand"
         />
-        <FieldError message={state.error} />
-        <button type="submit" disabled={pending} className="btn btn-primary mt-3">
-          {pending ? "Envoi…" : "Envoyer"}
+        {state.error && (
+          <p role="alert" className="mt-2 text-[15px] font-semibold" style={{ color: "var(--color-danger)" }}>
+            {state.error}
+          </p>
+        )}
+        {state.success && (
+          <p role="status" className="mt-2 text-[15px] font-semibold" style={{ color: "var(--color-success)" }}>
+            Message envoyé.
+          </p>
+        )}
+        <button type="submit" disabled={pending} className="btn btn-primary btn-grand mt-3 w-full">
+          {pending ? "Envoi…" : coach ? `Envoyer à ${coach}` : "Envoyer"}
         </button>
       </form>
     </section>

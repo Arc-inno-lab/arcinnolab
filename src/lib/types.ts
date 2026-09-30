@@ -1,5 +1,17 @@
 export type UserRole = "admin" | "partenaire" | "porteur";
-export type ProjetEtat = "brouillon" | "soumis" | "valide" | "en_cours" | "archive";
+export type ProjetEtat =
+  | "brouillon"
+  | "soumis"
+  | "valide"
+  | "en_cours"
+  | "archive"
+  // Ajoutés en migration 017. Les trois premiers états sont des vestiges de
+  // la V0 : un projet naît désormais « en cours », à l'admission.
+  | "en_pause"
+  | "termine";
+
+/** Les seuls états proposés dans l'interface. */
+export const ETATS_PROPOSES: ProjetEtat[] = ["en_cours", "en_pause", "termine"];
 export type InvitationStatut = "en_attente" | "acceptee" | "expiree" | "annulee";
 export type InvitationRoleCible = "partenaire" | "porteur";
 
@@ -63,6 +75,38 @@ export interface EtapeProjet {
   description: string | null;
   date_echeance: string | null;
   updated_at: string;
+  // Ajoutés en migration 018 : le parcours configurable. La colonne dit où en
+  // est le travail ; la validation, ce qu'en pense le référent. Les deux sont
+  // indépendantes.
+  type: ElementParcours;
+  colonne_id: string | null;
+  validation: ValidationEtape | null;
+  rdv_debut: string | null;
+  rdv_mode: RdvMode | null;
+  rdv_lieu: string | null;
+  rdv_statut: StatutRdv | null;
+  rdv_avec: string | null;
+  cree_par: string | null;
+}
+
+export type ElementParcours = "etape" | "rendez_vous" | "document";
+export type ValidationEtape = "a_valider" | "validee" | "refusee";
+export type StatutRdv = "propose" | "confirme" | "annule";
+export type RdvMode = "visio" | "telephone" | "sur_place";
+
+export const RDV_MODE_LABELS: Record<RdvMode, string> = {
+  visio: "en visio",
+  telephone: "au téléphone",
+  sur_place: "sur place",
+};
+
+export interface ColonneProjet {
+  id: string;
+  projet_id: string;
+  nom: string;
+  ordre: number;
+  terminale: boolean;
+  created_at: string;
 }
 
 export const ETAPE_STATUT_LABELS: Record<EtapeStatut, string> = {
@@ -129,7 +173,10 @@ export type NotificationType =
   | "message_demande"
   // Ouverture automatique d'un projet à l'admission d'une candidature
   // (cf. migration 016).
-  | "projet";
+  | "projet"
+  // Parcours configurable (cf. migration 018).
+  | "etape_a_valider"
+  | "rendez_vous";
 
 export interface AppNotification {
   id: string;
@@ -237,6 +284,8 @@ export interface MessageSuivi {
   auteur: AuteurMessage;
   contenu: string;
   envoye_le: string;
+  /** Prénom de l'équipier, pour que le porteur sache à qui il parle. */
+  auteur_prenom: string | null;
 }
 
 export interface Reinitialisation {
@@ -342,7 +391,9 @@ export const DEMANDE_STATUT_LABELS: Record<DemandeStatut, string> = {
 };
 
 export const DEMANDE_STATUT_COLORS: Record<DemandeStatut, string> = {
-  nouvelle: "var(--color-accent)",
+  // Le rouge est réservé au retard et au refus : une demande neuve n'est pas
+  // une alerte. C'est son ancienneté, affichée à part, qui peut l'être.
+  nouvelle: "#3b4452",
   en_accueil: "var(--color-primary-2)",
   orientee: "var(--color-success)",
   en_attente_comite: "var(--color-warning, #c98b1e)",
@@ -382,6 +433,8 @@ export const ETAT_LABELS: Record<ProjetEtat, string> = {
   valide: "Validé",
   en_cours: "En cours",
   archive: "Archivé",
+  en_pause: "En pause",
+  termine: "Terminé",
 };
 
 export const ETAT_COLORS: Record<ProjetEtat, string> = {
@@ -390,4 +443,6 @@ export const ETAT_COLORS: Record<ProjetEtat, string> = {
   valide: "var(--color-success)",
   en_cours: "var(--color-primary)",
   archive: "#8a8f98",
+  en_pause: "#8a6d1e",
+  termine: "var(--color-success)",
 };

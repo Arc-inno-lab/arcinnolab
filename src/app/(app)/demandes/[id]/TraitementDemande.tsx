@@ -126,7 +126,7 @@ export function FormOrientation({
                   {o.date_relance && (
                     <p className="mt-1 text-xs" style={{ color: "var(--color-muted)" }}>
                       À relancer le{" "}
-                      {new Date(o.date_relance).toLocaleDateString("fr-FR")}
+                      {new Date(o.date_relance).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                     </p>
                   )}
                 </div>
@@ -252,7 +252,7 @@ export function FormPromotion({
           <option key={p.id} value={p.id}>
             {p.nom}
             {p.date_comite
-              ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR")}`
+              ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
               : ""}
           </option>
         ))}

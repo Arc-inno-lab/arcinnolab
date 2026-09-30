@@ -1,5 +1,6 @@
 "use server";
 
+import { PREFIXE_DOCUMENT } from "@/lib/parcours";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createServerClient } from "@/lib/supabase/server";
@@ -88,6 +89,7 @@ export async function createInvitation(_prev: ActionResult, formData: FormData):
   revalidatePath("/admin");
   revalidatePath("/invitations");
   if (projetId) revalidatePath(`/projets/${projetId}`);
+ revalidatePath("/mon-projet");
   return { success: true, inviteUrl: `${APP_URL}/invite/${data.token}` };
 }
 
@@ -131,66 +133,12 @@ export async function createProjet(_prev: ActionResult, formData: FormData): Pro
 // (projets_update : admin, ou référent via is_project_referent()).
 // ------------------------------------------------------------------
 export async function updateProjetEtat(projetId: string, etat: string): Promise<void> {
+  if (!["en_cours", "en_pause", "termine", "archive"].includes(etat)) return;
   const supabase = await createServerClient();
   await supabase.from("projets").update({ etat }).eq("id", projetId);
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
   revalidatePath("/projets");
-}
-
-// ------------------------------------------------------------------
-// Étapes du "passeport projet" : ajout par le référent (ou l'admin), passe par la RLS
-// etapes_projet_write (admin ou is_project_referent()).
-// ------------------------------------------------------------------
-export async function createEtape(projetId: string, titre: string): Promise<void> {
-  const texte = titre.trim();
-  if (!texte) return;
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { count } = await supabase
-    .from("etapes_projet")
-    .select("id", { count: "exact", head: true })
-    .eq("projet_id", projetId);
-  await supabase.from("etapes_projet").insert({
-    projet_id: projetId,
-    titre: texte,
-    ordre: count ?? 0,
-  });
-  revalidatePath(`/projets/${projetId}`);
-
-  if (user) {
-    await notifyProjectTeam(supabase, projetId, user.id, "etape_ajoutee", `Nouvelle étape : « ${texte} »`);
-  }
-}
-
-// ------------------------------------------------------------------
-// Validation/refus d'une étape par le référent (ou l'admin) — avis facultatif.
-// ------------------------------------------------------------------
-export async function updateEtapeStatut(
-  projetId: string,
-  etapeId: string,
-  statut: string,
-  avis?: string
-): Promise<void> {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const isTerminal = statut === "validee" || statut === "refusee";
-  const { data: etape } = await supabase
-    .from("etapes_projet")
-    .update({
-      statut,
-      avis: avis?.trim() || null,
-      id_partenaire_validateur: isTerminal ? user?.id ?? null : null,
-      date_validation: isTerminal ? new Date().toISOString() : null,
-    })
-    .eq("id", etapeId)
-    .select("titre")
-    .single();
-  revalidatePath(`/projets/${projetId}`);
-
-  if (isTerminal && user && etape) {
-    const label = statut === "validee" ? "validée" : "refusée";
-    await notifyProjectTeam(supabase, projetId, user.id, "etape_statut", `Étape « ${etape.titre} » ${label}`);
-  }
 }
 
 // ------------------------------------------------------------------
@@ -259,6 +207,62 @@ export async function createMessageProjet(projetId: string, contenu: string): Pr
 
   await notifyProjectTeam(supabase, projetId, user.id, "message_projet", `${auteur} a écrit dans le fil du projet`);
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
+  revalidatePath("/mon-projet/messages");
+}
+
+/**
+ * Message du fil de projet avec, éventuellement, un document joint. Le
+ * document rejoint les pièces du projet ; le message le signale, et la
+ * messagerie en fait un lien.
+ */
+export async function envoyerMessageProjet(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const projetId = String(formData.get("projet_id") || "");
+  const texte = String(formData.get("contenu") || "").trim();
+  const fichier = formData.get("fichier") as File | null;
+  const avecFichier = !!fichier && fichier.size > 0;
+  if (!projetId) return { error: "Projet introuvable." };
+  if (!texte && !avecFichier) return { error: "Écrivez un message ou joignez un document." };
+  if (avecFichier && fichier.size > 4 * 1024 * 1024) return { error: "Ce document dépasse 4 Mo : envoyez une version plus légère." };
+
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Session expirée : reconnectez-vous." };
+
+  if (avecFichier) {
+    const url = await uploadToMedia(supabase, fichier, `documents/${projetId}`);
+    if (!url) return { error: "Le document n'a pas pu être envoyé." };
+    const { error } = await supabase.from("documents").insert({
+      projet_id: projetId,
+      etape_id: null,
+      type: fichier.type || "fichier",
+      nom_fichier: fichier.name,
+      lien_fichier: url,
+      uploaded_by: user.id,
+    });
+    if (error) return { error: "Le document n'a pas pu être enregistré." };
+    await supabase
+      .from("messages_projet")
+      .insert({ projet_id: projetId, auteur_id: user.id, contenu: PREFIXE_DOCUMENT + fichier.name });
+  }
+  if (texte) {
+    const { error } = await supabase.from("messages_projet").insert({ projet_id: projetId, auteur_id: user.id, contenu: texte });
+    if (error) return { error: "Message non envoyé : " + error.message };
+  }
+
+  const { data: profile } = await supabase.from("profiles").select("nom, prenom").eq("id", user.id).maybeSingle();
+  const auteur = profile ? `${profile.prenom} ${profile.nom}` : "Un membre du projet";
+  await notifyProjectTeam(
+    supabase,
+    projetId,
+    user.id,
+    "message_projet",
+    avecFichier && !texte ? `${auteur} a déposé un document` : `${auteur} a écrit dans le fil du projet`
+  );
+  revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
+  revalidatePath("/mon-projet/messages");
+  return { success: true };
 }
 
 // ------------------------------------------------------------------
@@ -332,6 +336,7 @@ export async function updateProjetLogo(projetId: string, formData: FormData): Pr
 
   await supabase.from("projets").update({ logo_url: url }).eq("id", projetId);
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
   revalidatePath("/projets");
 }
 
@@ -1060,6 +1065,7 @@ export async function updateEtape(_prev: ActionResult, formData: FormData): Prom
   if (error) return { error: error.message };
 
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
   revalidatePath(`/projets/${projetId}/etapes/${etapeId}`);
   return { success: true };
 }
@@ -1069,6 +1075,7 @@ export async function deleteEtape(projetId: string, etapeId: string): Promise<vo
   const supabase = await createServerClient();
   await supabase.from("etapes_projet").delete().eq("id", etapeId);
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
 }
 
 /**
@@ -1093,6 +1100,7 @@ export async function updateProjetDescription(
   if (error) return { error: error.message };
 
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
   return { success: true };
 }
 
@@ -1125,6 +1133,7 @@ export async function rattacherPartenaire(
   }
 
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
   return { success: true };
 }
 
@@ -1136,4 +1145,5 @@ export async function detacherPartenaire(projetId: string, partenaireId: string)
     .eq("projet_id", projetId)
     .eq("partenaire_id", partenaireId);
   revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/mon-projet");
 }

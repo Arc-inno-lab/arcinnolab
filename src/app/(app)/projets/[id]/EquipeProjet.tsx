@@ -43,20 +43,12 @@ export function EquipeProjet({
   const [retrait, startRetrait] = useTransition();
 
   return (
-    <section aria-labelledby="equipe-heading" className="card p-5">
-      <h2 id="equipe-heading" className="mb-1 text-lg font-medium">
-        Qui travaille sur ce projet
-      </h2>
-      <p className="mb-4 text-sm" style={{ color: "var(--color-muted)" }}>
-        Les personnes listées ici sont les seules que le porteur voit et peut
-        contacter. Le reste du consortium ne lui apparaît pas.
-      </p>
-
-      <div className="grid gap-5 sm:grid-cols-2">
+    <section aria-label="Qui travaille sur ce projet" className="card h-full p-5">
+      <div className="grid gap-5 sm:grid-cols-2 sm:divide-x" style={{ borderColor: "#eef1f6" }}>
         {/* ── Porteurs ── */}
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">
+            <h3 className="text-base font-semibold">
               Porteurs ({membres.length + invitations.length})
             </h3>
             {peutGerer && (
@@ -117,9 +109,9 @@ export function EquipeProjet({
         </div>
 
         {/* ── Partenaires ── */}
-        <div>
+        <div className="sm:pl-5">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">
+            <h3 className="text-base font-semibold">
               Partenaires ({partenaires.length + (referent ? 1 : 0)})
             </h3>
             {peutGerer && (
@@ -146,8 +138,8 @@ export function EquipeProjet({
                   <p className="truncate font-medium">
                     {referent.prenom} {referent.nom}
                   </p>
-                  <p className="text-xs" style={{ color: "var(--color-primary)" }}>
-                    référent
+                  <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+                    <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>référent</span>
                   </p>
                 </div>
               </li>

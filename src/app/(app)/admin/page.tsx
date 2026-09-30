@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Invitation, Promotion } from "@/lib/types";
@@ -33,7 +34,12 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold">Back-office administrateur</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Administration</h1>
+        <Link href="/invitations/new" className="btn btn-primary">
+          Inviter un partenaire ou un porteur
+        </Link>
+      </div>
 
       {/* Les promotions viennent en premier : sans promotion ouverte, aucune
           candidature ne peut être versée au comité, et toute la voie
@@ -154,7 +160,7 @@ export default async function AdminPage() {
                   <td className="px-4 py-2">{inv.email}</td>
                   <td className="px-4 py-2">{ROLE_LABELS[inv.role_cible]}</td>
                   <td className="px-4 py-2">{inv.statut}</td>
-                  <td className="px-4 py-2">{new Date(inv.date_expiration).toLocaleDateString("fr-FR")}</td>
+                  <td className="px-4 py-2">{new Date(inv.date_expiration).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</td>
                   <td className="px-4 py-2">
                     {inv.statut === "en_attente" && <CancelInvitationButton id={inv.id} />}
                   </td>

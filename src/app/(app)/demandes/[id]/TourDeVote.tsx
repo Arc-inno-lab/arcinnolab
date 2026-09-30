@@ -67,7 +67,7 @@ export function OuvrirTour({
               <option key={p.id} value={p.id}>
                 {p.nom}
                 {p.date_comite
-                  ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR")}`
+                  ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
                   : ""}
               </option>
             ))}

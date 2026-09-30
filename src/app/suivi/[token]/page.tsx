@@ -26,7 +26,55 @@ type Suivi = {
   message_porteur: string | null;
   instruction_en_cours: boolean;
   instruction_echeance: string | null;
+  // Ajoutés en migration 018 : le prénom de l'interlocuteur, pour que le
+  // porteur sache à qui il parle, et son invitation une fois admis.
+  coach_prenom: string | null;
+  coach_nom: string | null;
+  invitation_token: string | null;
+  a_deja_un_acces: boolean;
 };
+
+const ETAPES = ["Demande reçue", "Premier échange", "Mise en relation ou candidature", "Réponse et prochaines étapes"];
+
+function numeroEtape(s: Suivi): number {
+  switch (s.statut) {
+    case "nouvelle":
+      return 1;
+    case "en_accueil":
+      return 2;
+    case "orientee":
+    case "en_attente_comite":
+    case "en_instruction":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function grandTitre(s: Suivi): string {
+  switch (s.statut) {
+    case "nouvelle":
+      return "Votre demande est bien arrivée";
+    case "en_accueil":
+      return "Votre demande est entre de bonnes mains";
+    case "orientee":
+      return "Vous avez été mis en relation";
+    case "en_attente_comite":
+      return "Votre candidature ira au comité";
+    case "en_instruction":
+      return "Votre projet est à l'étude";
+    case "admise":
+      return "Bonne nouvelle : votre projet est retenu";
+    case "non_retenue":
+      return "Votre projet n'a pas été retenu";
+    case "close":
+      return "Votre demande est close";
+  }
+}
+
+function jour(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", year: "numeric" });
+}
 
 /**
  * Ce que le porteur lit, formulé de son point de vue.
@@ -71,7 +119,7 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
         texte: s.promotion_date_comite
           ? `Votre projet sera examiné par le comité mixte franco-suisse de la ${s.promotion_nom}, qui se réunit le ${new Date(
               s.promotion_date_comite
-            ).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}.`
+            ).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", year: "numeric" })}.`
           : `Votre projet sera examiné par le comité mixte franco-suisse${
               s.promotion_nom ? ` de la ${s.promotion_nom}` : ""
             }. La date de sa prochaine réunion vous sera communiquée.`,
@@ -85,7 +133,7 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
         texte: s.instruction_echeance
           ? `Les cinq structures du consortium examinent votre candidature et rendent chacune un avis. La consultation se termine le ${new Date(
               s.instruction_echeance
-            ).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`
+            ).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" })}.`
           : "Les cinq structures du consortium examinent votre candidature et rendent chacune un avis.",
         aFaire:
           "Rien à faire : ces avis prépareront la décision du comité, qui vous sera communiquée ici même avec ses motifs.",
@@ -95,7 +143,7 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
       return {
         titre: "Votre projet est retenu",
         texte:
-          "Votre candidature a été retenue pour l'accompagnement ArcInnoLab. Un coach référent va construire votre parcours avec vous.",
+          "Votre candidature a été retenue pour l'accompagnement ArcInnoLab. Un accompagnateur va construire votre parcours avec vous.",
         aFaire: "Votre interlocuteur vous contacte pour définir les prochaines étapes.",
         couleur: "var(--color-primary)",
       };
@@ -130,11 +178,11 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
   const messages = (fil as MessageSuivi[] | null) ?? [];
 
   return (
-    <main id="main" className="mx-auto w-full max-w-2xl px-4 py-10">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <main id="main" className="mx-auto w-full max-w-2xl px-4 py-6 text-[17px] md:py-10">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <Logo />
-        <Link href="/a-propos" className="btn btn-outline">
-          À propos du projet
+        <Link href="/a-propos" className="text-[15px]" style={{ color: "#3b4452" }}>
+          À propos d&apos;ArcInnoLab
         </Link>
       </div>
 
@@ -151,77 +199,158 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
           </Link>
         </div>
       ) : (
-        <>
-          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Bonjour {suivi.prenom}, voici où en est votre demande.
-          </p>
-          <h1 className="mb-6 text-2xl font-semibold">{suivi.titre_projet}</h1>
-
-          <section className="card mb-5 p-6">
-            <span
-              className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
-              style={{ background: etat(suivi).couleur, color: "#fff" }}
-            >
-              {etat(suivi).titre}
-            </span>
-            <p className="text-sm">{etat(suivi).texte}</p>
-
-            <p className="mt-4 text-sm font-medium">Ce que vous avez à faire</p>
-            <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-              {etat(suivi).aFaire}
-            </p>
-          </section>
-
-          {/* Le message de décision, quand il y en a un. Il est affiché tel que
-              l'équipe l'a validé — c'est la justification que le porteur est en
-              droit d'obtenir, surtout en cas de refus. */}
-          {suivi.message_porteur && (
-            <section className="card mb-5 p-6">
-              <h2 className="mb-3 text-lg font-medium">
-                {suivi.statut === "non_retenue"
-                  ? "Pourquoi votre projet n'a pas été retenu"
-                  : "Message de l'équipe"}
-              </h2>
-              <p className="whitespace-pre-wrap text-sm">{suivi.message_porteur}</p>
-            </section>
-          )}
-
-          <section className="card mb-5 p-6">
-            <h2 className="mb-3 text-lg font-medium">Repères</h2>
-            <dl className="flex flex-col gap-2 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt style={{ color: "var(--color-muted)" }}>Demande déposée le</dt>
-                <dd>{new Date(suivi.deposee_le).toLocaleDateString("fr-FR")}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt style={{ color: "var(--color-muted)" }}>Dernière mise à jour</dt>
-                <dd>{new Date(suivi.mise_a_jour_le).toLocaleDateString("fr-FR")}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt style={{ color: "var(--color-muted)" }}>Interlocuteur désigné</dt>
-                <dd>{suivi.prise_en_charge ? "Oui" : "Pas encore"}</dd>
-              </div>
-              {suivi.nb_orientations > 0 && (
-                <div className="flex justify-between gap-4">
-                  <dt style={{ color: "var(--color-muted)" }}>Mises en relation</dt>
-                  <dd>{suivi.nb_orientations}</dd>
-                </div>
-              )}
-            </dl>
-          </section>
-
-          <EchangePorteur token={token} messages={messages} />
-
-          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Cette page se met à jour toute seule. Conservez son adresse : elle
-            reste votre accès au suivi, sans compte ni mot de passe.
-          </p>
-        </>
+        <Contenu suivi={suivi} token={token} messages={messages} />
       )}
 
       <div className="mt-8">
         <InterregMention />
       </div>
     </main>
+  );
+}
+
+function Contenu({ suivi, token, messages }: { suivi: Suivi; token: string; messages: MessageSuivi[] }) {
+  const e = etat(suivi);
+  const n = numeroEtape(suivi);
+  const coach = suivi.coach_prenom;
+  const dernier = messages[messages.length - 1];
+  const aVousDeJouer = dernier?.auteur === "equipe" && !["admise", "non_retenue", "close"].includes(suivi.statut);
+  const initiales = `${suivi.coach_prenom?.charAt(0) ?? ""}${suivi.coach_nom?.charAt(0) ?? ""}`.toUpperCase();
+
+  return (
+    <>
+      <p style={{ color: "var(--color-muted)" }}>Bonjour {suivi.prenom},</p>
+      <h1 className="mb-1 text-[26px] font-bold leading-tight">{grandTitre(suivi)}</h1>
+      <p className="mb-5 text-[15px]" style={{ color: "var(--color-muted)" }}>
+        Votre demande : {suivi.titre_projet}
+      </p>
+
+      <section className="card mb-6 p-5">
+        <div className="mb-3 grid grid-cols-4 gap-1.5" aria-hidden="true">
+          {ETAPES.map((_, i) => (
+            <span
+              key={i}
+              className="h-1.5 rounded-full"
+              style={{ background: i + 1 < n ? "var(--color-success)" : i + 1 === n ? "var(--color-primary)" : "#dfe4ec" }}
+            />
+          ))}
+        </div>
+        <p className="text-[15px] font-bold" style={{ color: "var(--color-primary)" }}>
+          Étape {n} sur 4 · {ETAPES[n - 1]}
+        </p>
+
+        {coach && (
+          <div className="mt-4 flex items-center gap-3">
+            <span
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white"
+              style={{ background: "var(--color-primary)" }}
+              aria-hidden="true"
+            >
+              {initiales}
+            </span>
+            <div>
+              <p className="text-[18px] font-bold">
+                {suivi.coach_prenom} {suivi.coach_nom}
+              </p>
+              <p className="text-[15px]" style={{ color: "var(--color-muted)" }}>
+                s&apos;occupe de votre demande
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 rounded-xl p-4" style={{ background: "var(--color-primary-soft)" }}>
+          <p className="text-[15px] font-bold" style={{ color: "var(--color-primary)" }}>
+            {aVousDeJouer ? "À vous de jouer" : "Ce qui se passe maintenant"}
+          </p>
+          <p className="mt-1">
+            {aVousDeJouer
+              ? `${coach ?? "L'équipe"} vous a écrit. Répondez juste en dessous.`
+              : `${e.texte} ${e.aFaire}`}
+          </p>
+        </div>
+
+        {suivi.statut === "admise" && (
+          <div className="mt-4">
+            {suivi.a_deja_un_acces ? (
+              <>
+                <p className="mb-3">Votre espace projet est prêt : vos étapes, vos rendez-vous et vos échanges vous y attendent.</p>
+                <Link href="/login" className="btn btn-primary btn-grand w-full">
+                  Accéder à mon espace
+                </Link>
+              </>
+            ) : suivi.invitation_token ? (
+              <>
+                <p className="mb-3">
+                  Votre espace projet vous attend : vos étapes, vos rendez-vous et vos échanges avec
+                  {coach ? ` ${coach}` : " votre accompagnateur"}, au même endroit.
+                </p>
+                <Link href={`/invite/${suivi.invitation_token}`} className="btn btn-primary btn-grand w-full">
+                  Créer mon accès
+                </Link>
+              </>
+            ) : (
+              <p style={{ color: "#3b4452" }}>
+                {coach ?? "Votre accompagnateur"} vous envoie bientôt le lien pour créer votre accès à votre espace projet.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Le message de décision, tel que l'équipe l'a validé : c'est la
+          justification que le porteur est en droit d'obtenir, surtout en cas
+          de refus. */}
+      {suivi.message_porteur && (
+        <section className="card mb-6 p-5">
+          <h2 className="mb-2 text-[18px] font-bold">
+            {suivi.statut === "non_retenue" ? "Pourquoi votre projet n'a pas été retenu" : "Le message de l'équipe"}
+          </h2>
+          <p className="whitespace-pre-wrap">{suivi.message_porteur}</p>
+        </section>
+      )}
+
+      <EchangePorteur token={token} messages={messages} coach={coach} />
+
+      <section className="card mb-6 p-5">
+        <h2 className="mb-3 text-[18px] font-bold">La suite, en 4 étapes</h2>
+        <ol className="flex flex-col gap-3">
+          {ETAPES.map((libelle, i) => {
+            const fait = i + 1 < n || (i + 1 === n && n === 4);
+            const courant = i + 1 === n && n !== 4;
+            return (
+              <li key={libelle} className="flex items-center gap-3">
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-bold"
+                  style={
+                    fait
+                      ? { background: "var(--color-success)", color: "#fff" }
+                      : courant
+                        ? { background: "var(--color-primary)", color: "#fff" }
+                        : { border: "2px solid #cfd6e2", color: "#3b4452" }
+                  }
+                  aria-hidden="true"
+                >
+                  {fait ? "✓" : i + 1}
+                </span>
+                <span className={courant ? "font-bold" : ""}>
+                  {i === 1 && coach ? `Premier échange avec ${coach}` : libelle}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-4 text-[15px]" style={{ color: "var(--color-muted)" }}>
+          Déposée le {jour(suivi.deposee_le)} · mise à jour le {jour(suivi.mise_a_jour_le)}
+          {suivi.nb_orientations > 0
+            ? ` · ${suivi.nb_orientations} mise${suivi.nb_orientations > 1 ? "s" : ""} en relation`
+            : ""}
+        </p>
+      </section>
+
+      <p className="text-[15px]" style={{ color: "var(--color-muted)" }}>
+        Gardez cette page dans vos favoris : c&apos;est votre accès, sans mot de passe. Elle se met à jour toute seule.
+      </p>
+    </>
   );
 }

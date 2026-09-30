@@ -353,7 +353,9 @@ textarea {
 /* ------------------------------------------------------------------ */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(172px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 1fr);
+  align-items: start;
   gap: 0.875rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
@@ -361,7 +363,11 @@ textarea {
 
 @media (max-width: 900px) {
   .kanban-board {
-    grid-template-columns: repeat(4, minmax(78vw, 1fr));
+    grid-auto-columns: minmax(78vw, 1fr);
+    scroll-snap-type: x mandatory;
+  }
+  .kanban-column {
+    scroll-snap-align: start;
   }
 }
 
@@ -573,3 +579,41 @@ textarea {
 
 /* Bande des partenaires : plus de filtre, on respecte leurs identités. */
 .partner-strip img { filter: none; opacity: 1; }
+
+/* ------------------------------------------------------------------ */
+/* Côté porteur : gros boutons, gros champs, mots simples              */
+/* ------------------------------------------------------------------ */
+.btn-grand {
+  min-height: 54px;
+  font-size: 17px;
+  border-radius: 14px;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.champ-grand {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  font-size: 17px;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.champ-grand:focus {
+  border-color: var(--color-primary-2);
+}
+
+.pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}

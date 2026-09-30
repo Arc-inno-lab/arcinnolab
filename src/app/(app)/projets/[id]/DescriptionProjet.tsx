@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { updateProjetDescription } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
 
@@ -14,23 +15,23 @@ export function DescriptionProjet({
   projetId,
   description,
   peutEditer,
+  lienDemande,
 }: {
   projetId: string;
   description: string | null;
   peutEditer: boolean;
+  lienDemande?: string | null;
 }) {
   const [state, action, pending] = useActionState(updateProjetDescription, {});
   const [edition, setEdition] = useState(false);
 
-  if (!peutEditer && !description) return null;
-
   if (!peutEditer || (!edition && !state.error)) {
     return (
-      <div className="card p-5">
+      <div className="card h-full p-5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-medium">Description</h2>
+          <h2 className="text-lg font-semibold">Le projet</h2>
           {peutEditer && (
-            <button type="button" onClick={() => setEdition(true)} className="btn btn-outline text-xs">
+            <button type="button" onClick={() => setEdition(true)} className="text-sm font-semibold" style={{ color: "var(--color-primary)", minHeight: 32 }}>
               Modifier
             </button>
           )}
@@ -42,13 +43,18 @@ export function DescriptionProjet({
             </span>
           )}
         </p>
+        {lienDemande && (
+          <Link href={lienDemande} className="mt-2 inline-block text-sm">
+            Lire la demande d&apos;origine
+          </Link>
+        )}
       </div>
     );
   }
 
   return (
-    <form action={action} className="card p-5">
-      <h2 className="mb-2 text-lg font-medium">Description</h2>
+    <form action={action} className="card h-full p-5">
+      <h2 className="mb-2 text-lg font-semibold">Le projet</h2>
       <input type="hidden" name="projet_id" value={projetId} />
       <label htmlFor="description-projet" className="sr-only">
         Description du projet

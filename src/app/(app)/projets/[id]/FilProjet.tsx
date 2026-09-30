@@ -53,8 +53,8 @@ export function FilProjet({
         </h2>
         <p className="text-xs" style={{ color: "var(--color-muted)" }}>
           {messages.length
-            ? `${messages.length} message${messages.length > 1 ? "s" : ""} · visible par toute l'équipe du projet`
-            : "Visible par toute l'équipe du projet"}
+            ? `${messages.length} message${messages.length > 1 ? "s" : ""} · porteurs et partenaires du projet`
+            : "Visible par les porteurs et les partenaires du projet"}
         </p>
       </header>
 
@@ -86,6 +86,7 @@ export function FilProjet({
                     {m.auteur?.role && ` · ${ROLE_LABELS[m.auteur.role]}`}
                     {" · "}
                     {new Date(m.created_at).toLocaleString("fr-FR", {
+                      timeZone: "Europe/Paris",
                       day: "numeric",
                       month: "short",
                       hour: "2-digit",

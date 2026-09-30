@@ -3,8 +3,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addEtapeDocument } from "@/app/actions";
 import {
-  ETAPE_STATUT_LABELS,
-  ETAPE_STATUT_COLORS,
   type DocumentProjet,
   type EtapeProjet,
   type MessageProjet,
@@ -12,7 +10,7 @@ import {
   type Projet,
 } from "@/lib/types";
 import { EtapeThread } from "./EtapeThread";
-import { EtapeAvisForm } from "./EtapeAvisForm";
+import { DepotDocument } from "./DepotDocument";
 
 export default async function EtapePage({
   params,
@@ -45,9 +43,16 @@ export default async function EtapePage({
     .maybeSingle<EtapeProjet>();
   if (!etape) notFound();
 
-  const isReferent = profile?.id === projet.id_partenaire_createur;
-  const isAdmin = profile?.role === "admin";
-  const peutGerer = isReferent || isAdmin;
+  const estPorteur = profile?.role === "porteur";
+  const retour = estPorteur ? `/mon-projet?p=${id}` : `/projets/${id}`;
+  const validation =
+    etape.validation === "validee"
+      ? { texte: "Validée", couleur: "var(--color-success)", fond: "var(--color-success-soft)" }
+      : etape.validation === "a_valider"
+        ? { texte: estPorteur ? "Votre accompagnateur doit la valider" : "À valider", couleur: "#3b4452", fond: "#e9edf4" }
+        : etape.validation === "refusee"
+          ? { texte: "À reprendre", couleur: "var(--color-danger)", fond: "var(--color-accent-soft)" }
+          : null;
 
   const [{ data: messages }, { data: documents }] = await Promise.all([
     supabase
@@ -66,42 +71,32 @@ export default async function EtapePage({
 
   return (
     <div>
-      <Link href={`/projets/${id}`} className="mb-4 inline-block text-sm underline">
-        ← {projet.titre}
+      <Link href={retour} className="mb-4 inline-block text-sm">
+        ← {estPorteur ? "Mon projet" : projet.titre}
       </Link>
 
-      <div className="mb-1 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{etape.titre}</h1>
-        <span
-          className="tag"
-          style={
-            {
-              "--tag-color": ETAPE_STATUT_COLORS[etape.statut],
-              "--tag-bg": "var(--color-surface-alt)",
-            } as React.CSSProperties
-          }
-        >
-          {ETAPE_STATUT_LABELS[etape.statut]}
-        </span>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-bold">{etape.titre}</h1>
+        {validation && (
+          <span className="pastille" style={{ color: validation.couleur, background: validation.fond }}>
+            {validation.texte}
+          </span>
+        )}
       </div>
-      <p className="mb-6 text-sm" style={{ color: "var(--color-muted)" }}>
-        Le statut se change depuis le tableau Kanban de la fiche projet.
-      </p>
 
-      {peutGerer && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-lg font-medium">Avis</h2>
-          <EtapeAvisForm projetId={id} etapeId={etapeId} statut={etape.statut} avis={etape.avis} />
-        </section>
-      )}
-      {!peutGerer && etape.avis && (
-        <p className="mb-8 text-sm">
-          <strong>Avis :</strong> {etape.avis}
-        </p>
+      {etape.description && <p className="mb-6 whitespace-pre-wrap text-[17px]">{etape.description}</p>}
+
+      {etape.avis && (
+        <div className="card mb-8 p-4">
+          <p className="mb-1 text-sm font-semibold" style={{ color: "var(--color-muted)" }}>
+            {estPorteur ? "Le mot de votre accompagnateur" : "Avis du référent"}
+          </p>
+          <p className="whitespace-pre-wrap">{etape.avis}</p>
+        </div>
       )}
 
       <section className="mb-8">
-        <h2 className="mb-3 text-lg font-medium">Pièces jointes ({documents?.length ?? 0})</h2>
+        <h2 className="mb-3 text-lg font-medium">Documents ({documents?.length ?? 0})</h2>
         {!documents?.length ? (
           <p className="mb-3 text-sm" style={{ color: "var(--color-muted)" }}>
             Aucun fichier déposé sur cette étape.
@@ -114,24 +109,16 @@ export default async function EtapePage({
                 className="card flex items-center justify-between gap-2 p-3 text-sm"
               >
                 <a href={d.lien_fichier} target="_blank" rel="noopener noreferrer" className="truncate underline">
-                  📎 {d.nom_fichier}
+                  {d.nom_fichier}
                 </a>
                 <span style={{ color: "var(--color-muted)" }}>
-                  {new Date(d.date_upload).toLocaleDateString("fr-FR")}
+                  {new Date(d.date_upload).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                 </span>
               </li>
             ))}
           </ul>
         )}
-        <form action={addEtapeDocument.bind(null, id, etapeId)} className="flex flex-wrap items-center gap-2">
-          <label htmlFor="fichier" className="sr-only">
-            Ajouter un fichier
-          </label>
-          <input id="fichier" type="file" name="fichier" required className="text-sm" />
-          <button type="submit" className="btn btn-outline">
-            Ajouter un fichier
-          </button>
-        </form>
+        <DepotDocument action={addEtapeDocument.bind(null, id, etapeId)} />
       </section>
 
       <section>

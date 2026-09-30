@@ -25,6 +25,7 @@ import {
 } from "./TraitementDemande";
 import { OuvrirTour, TourEnCours, ProncerDecision } from "./TourDeVote";
 import { Echange } from "./Echange";
+import { LienSuivi } from "./LienSuivi";
 import { APP_URL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -130,67 +131,111 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
   const deposee = new Date(demande.created_at);
   const maintenant = instantCourant();
 
+  const attente =
+    demande.statut === "nouvelle" && maintenant - deposee.getTime() > 7 * 86_400_000
+      ? Math.floor((maintenant - deposee.getTime()) / 86_400_000)
+      : null;
+
+  const orientee = demande.statut === "orientee" || (orientations?.length ?? 0) > 0;
+  const troisieme = orientee && !tour ? "Orientation" : tour ? "Consultation des partenaires" : "Orientation ou consultation";
+  const etapes: Array<{ label: string; fait: boolean }> = [
+    { label: "Demande reçue", fait: true },
+    { label: "Prise en charge", fait: !!demande.coach_id },
+    { label: troisieme, fait: orientee || !!tourClos || decisionPrononcee },
+    { label: "Décision", fait: decisionPrononcee || demande.statut === "orientee" },
+    { label: "Projet", fait: !!demande.projet_id },
+  ];
+  const courante = etapes.findIndex((e) => !e.fait);
+  const frise = etapes.map((e, i) => ({
+    label: e.label,
+    etat: e.fait ? "fait" : i === courante ? "encours" : "a_venir",
+  }));
+
   return (
     <div>
-      <Link href="/demandes" className="mb-4 inline-block text-sm" style={{ color: "var(--color-primary)" }}>
-        ← Retour à l&apos;accueil des porteurs
+      <Link href="/demandes" className="mb-3 inline-block text-sm" style={{ color: "var(--color-primary)" }}>
+        ← Demandes
       </Link>
 
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">{demande.titre_projet}</h1>
-          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Déposée le{" "}
-            {deposee.toLocaleDateString("fr-FR", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+      {/* L'en-tête porte l'action qui fait avancer le dossier, et elle seule.
+          Elle était auparavant tout en bas, sous le fil d'échange : la seule
+          chose utile à faire sur une demande neuve était la dernière qu'on
+          voyait. */}
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 basis-96">
+          <h1 className="text-2xl font-bold">{demande.titre_projet}</h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-muted)" }}>
+            {demande.prenom} {demande.nom}
+            {demande.organisation ? ` · ${demande.organisation}` : ""} · {PAYS_LABELS[demande.pays]} · déposée le{" "}
+            {deposee.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" })}
+            {attente !== null && (
+              <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>
+                {" "}· sans réponse depuis {attente} jours
+              </span>
+            )}
           </p>
         </div>
-        <span
-          className="rounded-full px-3 py-1 text-sm font-semibold"
-          style={{ background: DEMANDE_STATUT_COLORS[demande.statut], color: "#fff" }}
-        >
-          {DEMANDE_STATUT_LABELS[demande.statut]}
-        </span>
-      </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!demande.coach_id ? (
+            <BoutonPriseEnCharge demandeId={demande.id} />
+          ) : demande.statut === "admise" && demande.projet_id ? (
+            <Link href={`/projets/${demande.projet_id}`} className="btn btn-primary">
+              Ouvrir le projet
+            </Link>
+          ) : tourOuvert && !monVote ? (
+            <a href="#consultation" className="btn btn-primary">
+              Donner mon avis
+            </a>
+          ) : tourClos && estAdmin && !decisionPrononcee ? (
+            <a href="#decision" className="btn btn-primary">
+              Prononcer la décision
+            </a>
+          ) : !tour && !decisionPrononcee && demande.statut !== "orientee" && demande.statut !== "close" ? (
+            <a href="#traitement" className="btn btn-primary">
+              Orienter ou consulter
+            </a>
+          ) : (
+            <span
+              className="rounded-full px-3 py-1 text-sm font-semibold"
+              style={{ background: DEMANDE_STATUT_COLORS[demande.statut], color: "#fff" }}
+            >
+              {DEMANDE_STATUT_LABELS[demande.statut]}
+            </span>
+          )}
+        </div>
+      </header>
 
-      {/* Fil conducteur. Il existe parce que les actions disponibles dépendent
-          de l'étape en cours : sans ce repère, une fonctionnalité qui n'est pas
-          encore accessible passe pour une fonctionnalité absente. */}
-      <ol className="mb-6 flex flex-wrap gap-2" aria-label="Étapes du traitement">
-        {(
-          [
-            { cle: "prise", label: "Prise en charge", fait: !!demande.coach_id },
-            { cle: "qualif", label: "Qualification", fait: !!demande.persona },
-            {
-              cle: "instruction",
-              label: "Consultation des partenaires",
-              fait: !!tour,
-              encours: !!tourOuvert,
-            },
-            {
-              cle: "decision",
-              label: "Décision",
-              fait: decisionPrononcee,
-              encours: !!tourClos && !decisionPrononcee,
-            },
-          ] as Array<{ cle: string; label: string; fait: boolean; encours?: boolean }>
-        ).map((e) => (
-          <li
-            key={e.cle}
-            className="rounded-full px-3 py-1 text-xs font-medium"
-            style={
-              e.encours
-                ? { background: "var(--color-primary)", color: "#fff" }
-                : e.fait
-                ? { background: "var(--color-success)", color: "#fff" }
-                : { background: "var(--color-surface-alt)", color: "var(--color-muted)" }
-            }
-          >
-            {e.fait && !e.encours ? "✓ " : ""}
-            {e.label}
+      {/* La même frise que celle du porteur, étape courante marquée : sans
+          ce repère, une fonctionnalité pas encore accessible passe pour une
+          fonctionnalité absente. */}
+      <ol
+        aria-label="Parcours de la demande"
+        className="card mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 text-sm"
+      >
+        {frise.map((e, i) => (
+          <li key={e.label} className="flex items-center gap-2" aria-current={e.etat === "encours" ? "step" : undefined}>
+            {i > 0 && <span aria-hidden="true" className="hidden h-0.5 w-8 sm:inline-block" style={{ background: e.etat === "fait" ? "#b9dcc9" : "var(--color-border)" }} />}
+            <span
+              aria-hidden="true"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
+              style={
+                e.etat === "fait"
+                  ? { background: "var(--color-success)", color: "#fff" }
+                  : e.etat === "encours"
+                    ? { background: "var(--color-primary)", color: "#fff" }
+                    : { border: "2px solid #c9d1de", color: "var(--color-muted)" }
+              }
+            >
+              {e.etat === "fait" ? "✓" : i + 1}
+            </span>
+            <span
+              style={{
+                color: e.etat === "fait" ? "var(--color-success)" : e.etat === "encours" ? "var(--color-primary)" : "var(--color-muted)",
+                fontWeight: e.etat === "a_venir" ? 400 : 600,
+              }}
+            >
+              {e.label}
+            </span>
           </li>
         ))}
       </ol>
@@ -206,21 +251,13 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             demandeId={demande.id}
             messages={messages ?? []}
             prenomPorteur={demande.prenom}
+            emailPorteur={demande.email}
             lienSuivi={lienSuivi}
+            monPrenom={profile?.prenom ?? ""}
           />
 
-          {!demande.coach_id ? (
-            <section className="card p-5">
-              <h2 className="mb-1 text-lg font-medium">Personne ne suit cette demande</h2>
-              <p className="mb-4 text-sm" style={{ color: "var(--color-muted)" }}>
-                Prenez-la en charge pour devenir l&apos;interlocuteur de ce
-                porteur. Tant que personne ne s&apos;en saisit, elle reste en
-                tête de file.
-              </p>
-              <BoutonPriseEnCharge demandeId={demande.id} />
-            </section>
-          ) : (
-            <>
+          {!demande.coach_id ? null : (
+            <div id="traitement" className="flex scroll-mt-6 flex-col gap-5">
               <FormQualification demande={demande} />
               <FormOrientation demandeId={demande.id} orientations={orientations ?? []} />
 
@@ -239,6 +276,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
               )}
 
               {tourOuvert && (
+                <div id="consultation" className="scroll-mt-6">
                 <TourEnCours
                   tour={tour!}
                   demandeId={demande.id}
@@ -246,14 +284,17 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                   estAdmin={estAdmin}
                   maintenant={maintenant}
                 />
+                </div>
               )}
 
               {tourClos && estAdmin && !decisionPrononcee && (
+                <div id="decision" className="scroll-mt-6">
                 <ProncerDecision
                   tour={tour!}
                   demandeId={demande.id}
                   messageActuel={demande.message_porteur}
                 />
+                </div>
               )}
 
               {decisionPrononcee && demande.message_porteur && (
@@ -269,7 +310,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
               {!decisionPossible && (
                 <FormDecision demandeId={demande.id} statut={demande.statut} />
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -324,12 +365,14 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             </dl>
           </section>
 
+          <LienSuivi lien={lienSuivi} prenom={demande.prenom} />
+
           <section className="card p-5">
             <h2 className="mb-3 text-lg font-medium">Suivi</h2>
             <dl className="flex flex-col gap-2 text-sm">
               <div>
                 <dt className="text-xs" style={{ color: "var(--color-muted)" }}>
-                  Coach référent
+                  Interlocuteur
                 </dt>
                 <dd>
                   {demande.coach
@@ -353,7 +396,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                         promotionRattachee.date_comite
                           ? ` — comité le ${new Date(
                               promotionRattachee.date_comite
-                            ).toLocaleDateString("fr-FR")}`
+                            ).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
                           : ""
                       }`
                     : "Aucune"}
@@ -372,18 +415,6 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             </dl>
           </section>
 
-          {demande.statut === "admise" && !demande.projet_id && (
-            <section className="card p-5">
-              <h2 className="mb-2 text-lg font-medium">Et maintenant ?</h2>
-              <p className="mb-3 text-sm">
-                Cette demande a été retenue. Créez la fiche projet, puis invitez
-                le porteur : il obtiendra son accès à la plateforme.
-              </p>
-              <Link href="/projets/nouveau" className="btn btn-primary">
-                Créer la fiche projet
-              </Link>
-            </section>
-          )}
         </aside>
       </div>
     </div>

@@ -1,19 +1,36 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/Avatar";
-import { ROLE_LABELS, type AppNotification, type Profile } from "@/lib/types";
+import { chargerAFaire } from "@/lib/a-faire";
+import type { AppNotification, Profile } from "@/lib/types";
 
-const PARTNER_LOGOS = [
-  { src: "/brand/partenaires/km0.png", alt: "KMØ" },
-  { src: "/brand/partenaires/he-arc.png", alt: "HE-Arc" },
-  { src: "/brand/partenaires/utbm.png", alt: "UTBM" },
-  { src: "/brand/partenaires/garesud.png", alt: "Gare Sud" },
-  { src: "/brand/partenaires/technhom.png", alt: "Techn'hom" },
-  { src: "/brand/partenaires/ville-delemont.png", alt: "Ville de Delémont" },
-  { src: "/brand/partenaires/basel-area.svg", alt: "Basel Area" },
-];
+export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+function salutation(): string {
+  return new Date().toLocaleDateString("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+function quand(iso: string): string {
+  return new Date(iso).toLocaleString("fr-FR", {
+    timeZone: "Europe/Paris",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * L'accueil de l'équipe ne répond qu'à une question : qu'attend-on de moi ?
+ * Tout ce qui s'affiche ici appelle un geste, avec son bouton. Le reste —
+ * l'historique, les chiffres — se trouve ailleurs.
+ */
+export default async function AFairePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
@@ -23,21 +40,10 @@ export default async function DashboardPage() {
     .single<Profile>();
 
   if (!profile) return null;
+  if (profile.role === "porteur") redirect("/mon-projet");
 
-  const equipe = profile.role === "admin" || profile.role === "partenaire";
-
-  const [
-    { count: nbProjets },
-    { count: nbEtapesEnCours },
-    { count: nbPartenaires },
-    { count: nbPorteurs },
-    { data: notifications },
-    { data: partenaires },
-  ] = await Promise.all([
-    supabase.from("projets").select("id", { count: "exact", head: true }),
-    supabase.from("etapes_projet").select("id", { count: "exact", head: true }).eq("statut", "en_cours"),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "partenaire"),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "porteur"),
+  const [aFaire, { data: nouvelles }] = await Promise.all([
+    chargerAFaire(supabase, user!.id, profile.role),
     supabase
       .from("notifications")
       .select("*")
@@ -45,152 +51,182 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: false })
       .limit(6)
       .returns<AppNotification[]>(),
-    supabase
-      .from("profiles")
-      .select("*")
-      .in("role", ["admin", "partenaire"])
-      .neq("id", user!.id)
-      .order("nom", { ascending: true })
-      .returns<Profile[]>(),
   ]);
 
+  const titre =
+    aFaire.total === 0
+      ? "Rien ne vous attend pour l'instant"
+      : aFaire.total === 1
+        ? "Une chose attend une action de votre part"
+        : `${aFaire.total} choses attendent une action de votre part`;
+
   return (
-    <div>
-      <div className="hero mb-8 fade-up">
-        <div className="hero-bg" style={{ backgroundImage: "url(/brand/hero.jpg)" }} aria-hidden="true" />
-        <div className="hero-content">
-          <p className="mb-1 text-sm font-medium opacity-90">Bonjour {profile.prenom} 👋</p>
-          <h1 className="mb-2 text-3xl font-bold">ArcInnoLab — l&apos;outil collaboratif</h1>
-          <p className="max-w-2xl text-sm opacity-90">
-            Projets, passeports d&apos;étapes, échanges et fichiers au même endroit. Tout ce qui
-            avance sur l&apos;InterLab de l&apos;innovation, visible par toute l&apos;équipe.
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <header>
+        <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+          Bonjour {profile.prenom} · {salutation()}
+        </p>
+        <h1 className="text-2xl font-bold md:text-3xl">{titre}</h1>
+      </header>
 
-      {/* Les compteurs de population ne sont montrés qu'à l'équipe : depuis la
-          migration 016, un porteur ne voit que les personnes rattachées à ses
-          projets, et afficher « 1 partenaire » lui donnerait une image fausse
-          du consortium. */}
-      <div className="kpi-grid mb-8">
-        <div className="kpi-card fade-up">
-          <div className="kpi-value">{nbProjets ?? 0}</div>
-          <div className="kpi-label">Projets</div>
-        </div>
-        <div className="kpi-card fade-up">
-          <div className="kpi-value">{nbEtapesEnCours ?? 0}</div>
-          <div className="kpi-label">Étapes en cours</div>
-        </div>
-        {equipe && (
-          <>
-            <div className="kpi-card fade-up">
-              <div className="kpi-value">{nbPartenaires ?? 0}</div>
-              <div className="kpi-label">Partenaires ArcInnoLab</div>
-            </div>
-            <div className="kpi-card fade-up">
-              <div className="kpi-value">{nbPorteurs ?? 0}</div>
-              <div className="kpi-label">Porteurs de projet</div>
-            </div>
-          </>
-        )}
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex flex-col gap-5">
+          <Bloc titre="Demandes sans réponse" lien={{ href: "/demandes", label: "Toute la file" }} vide="Toutes les demandes ont un interlocuteur.">
+            {aFaire.demandes.map((d, i) => (
+              <Ligne
+                key={d.id}
+                href={`/demandes/${d.id}`}
+                titre={d.titre_projet}
+                sousTitre={`${d.prenom} ${d.nom}${d.organisation ? ` · ${d.organisation}` : ""}`}
+                etat={
+                  d.joursAttente >= 7
+                    ? { texte: `Sans réponse depuis ${d.joursAttente} jours`, alerte: true }
+                    : { texte: d.joursAttente === 0 ? "Arrivée aujourd'hui" : `Arrivée il y a ${d.joursAttente} j` }
+                }
+                action="Je prends en charge"
+                principale={i === 0}
+              />
+            ))}
+          </Bloc>
 
-      <div className="mb-8 grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-        <section aria-labelledby="partenaires-heading">
-          <h2 id="partenaires-heading" className="mb-3 text-lg font-medium">
-            {equipe ? "L'équipe ArcInnoLab" : "Vos interlocuteurs"}
-          </h2>
-          {!partenaires?.length ? (
+          <Bloc titre="Votre avis est attendu" note="Tous les partenaires doivent se prononcer" vide="Aucune consultation n'attend votre avis.">
+            {aFaire.avis.map((a) => (
+              <Ligne
+                key={a.demandeId}
+                href={`/demandes/${a.demandeId}`}
+                titre={a.titre}
+                sousTitre={`${a.porteur} · ${a.votes} avis rendu${a.votes > 1 ? "s" : ""} sur ${a.attendus}`}
+                etat={{
+                  texte:
+                    a.joursRestants <= 0
+                      ? "Clôture aujourd'hui"
+                      : `Clôture dans ${a.joursRestants} jour${a.joursRestants > 1 ? "s" : ""}`,
+                  alerte: a.joursRestants <= 1,
+                }}
+                action="Donner mon avis"
+              />
+            ))}
+          </Bloc>
+
+          <Bloc titre="Dans vos projets" lien={{ href: "/projets", label: "Tous les projets" }} vide="Aucun retard, rien à valider.">
+            {aFaire.projets.map((p) => (
+              <Ligne
+                key={p.etapeId}
+                href={`/projets/${p.projetId}`}
+                titre={p.titre}
+                sousTitre={`${p.projetTitre}${p.porteur ? ` · ${p.porteur}` : ""}`}
+                etat={{ texte: p.detail, alerte: p.nature === "en_retard" }}
+                action={p.nature === "a_valider" ? "Valider" : p.nature === "rdv_a_confirmer" ? "Répondre" : "Ouvrir"}
+              />
+            ))}
+          </Bloc>
+        </div>
+
+        <aside className="card flex flex-col gap-4 p-5">
+          <h2 className="text-base font-semibold">Dernières nouvelles</h2>
+          {!nouvelles?.length ? (
             <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-              {equipe
-                ? "Personne d'autre pour le moment."
-                : "Aucun interlocuteur rattaché à vos projets pour l'instant. Votre référent apparaîtra ici."}
+              Rien de neuf.
             </p>
           ) : (
-            <div className="partner-directory">
-              {partenaires.map((p) => (
-                <div key={p.id} className="card card-hover flex items-center gap-3 p-3">
-                  <Avatar nom={p.nom} prenom={p.prenom} photoUrl={p.photo_url} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">
-                      {p.prenom} {p.nom}
-                    </p>
-                    <p className="truncate text-xs" style={{ color: "var(--color-muted)" }}>
-                      {ROLE_LABELS[p.role]}
-                      {p.organisation ? ` · ${p.organisation}` : ""}
-                    </p>
-                  </div>
-                  <Link href={`/messages/${p.id}`} className="btn btn-outline shrink-0" style={{ minHeight: "36px", padding: "0.375rem 0.75rem" }}>
-                    Contacter
-                  </Link>
-                </div>
+            <ul className="flex flex-col gap-3">
+              {nouvelles.map((n) => (
+                <li key={n.id} className="flex flex-col gap-0.5">
+                  {n.lien ? (
+                    <Link href={n.lien} className="text-sm" style={{ color: "var(--color-text)", fontWeight: n.lu ? 400 : 600 }}>
+                      {n.titre}
+                    </Link>
+                  ) : (
+                    <span className="text-sm">{n.titre}</span>
+                  )}
+                  <span className="text-xs" style={{ color: "var(--color-muted)" }}>
+                    {quand(n.created_at)}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </section>
-
-        <section aria-labelledby="activite-heading">
-          <h2 id="activite-heading" className="mb-3 text-lg font-medium">
-            Activité récente
-          </h2>
-          <div className="card p-2">
-            {!notifications?.length ? (
-              <p className="p-3 text-sm" style={{ color: "var(--color-muted)" }}>
-                Rien pour le moment.
-              </p>
-            ) : (
-              <ul>
-                {notifications.map((n) => (
-                  <li key={n.id} className="border-b p-3 text-sm last:border-0" style={{ borderColor: "var(--color-border)" }}>
-                    {n.lien ? (
-                      <Link href={n.lien} className="hover:underline">
-                        {n.titre}
-                      </Link>
-                    ) : (
-                      n.titre
-                    )}
-                    <div className="text-xs" style={{ color: "var(--color-muted)" }}>
-                      {new Date(n.created_at).toLocaleString("fr-FR")}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Link href="/projets" className="card card-hover p-5">
-          <h2 className="mb-1 text-base font-semibold">Projets</h2>
-          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Voir tous les projets et leur passeport d&apos;étapes.
-          </p>
-        </Link>
-        {(profile.role === "admin" || profile.role === "partenaire") && (
-          <Link href="/projets/nouveau" className="card card-hover p-5">
-            <h2 className="mb-1 text-base font-semibold">Nouveau projet</h2>
-            <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-              Créez une fiche projet et invitez un porteur.
-            </p>
+          <Link href="/notifications" className="text-sm">
+            Tout l&apos;historique
           </Link>
-        )}
-        {profile.role === "admin" && (
-          <Link href="/admin" className="card card-hover p-5">
-            <h2 className="mb-1 text-base font-semibold">Back-office</h2>
-            <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-              Comptes et invitations.
-            </p>
-          </Link>
-        )}
-      </div>
-
-      <div className="partner-strip mt-10 border-t" style={{ borderColor: "var(--color-border)" }}>
-        {PARTNER_LOGOS.map((l) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={l.alt} src={l.src} alt={l.alt} />
-        ))}
+        </aside>
       </div>
     </div>
+  );
+}
+
+function Bloc({
+  titre,
+  note,
+  lien,
+  vide,
+  children,
+}: {
+  titre: string;
+  note?: string;
+  lien?: { href: string; label: string };
+  vide: string;
+  children: React.ReactNode[];
+}) {
+  return (
+    <section className="card p-5">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-semibold">{titre}</h2>
+        {lien ? (
+          <Link href={lien.href} className="text-sm">
+            {lien.label}
+          </Link>
+        ) : note ? (
+          <span className="text-xs" style={{ color: "var(--color-muted)" }}>
+            {note}
+          </span>
+        ) : null}
+      </div>
+      {children.length ? (
+        <ul className="flex flex-col">{children}</ul>
+      ) : (
+        <p className="border-t pt-3 text-sm" style={{ color: "var(--color-muted)", borderColor: "#eef1f6" }}>
+          {vide}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Ligne({
+  href,
+  titre,
+  sousTitre,
+  etat,
+  action,
+  principale = false,
+}: {
+  href: string;
+  titre: string;
+  sousTitre: string;
+  etat: { texte: string; alerte?: boolean };
+  action: string;
+  principale?: boolean;
+}) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t py-3" style={{ borderColor: "#eef1f6" }}>
+      <div className="min-w-0 flex-1 basis-64">
+        <Link href={href} className="font-semibold" style={{ color: "var(--color-text)" }}>
+          {titre}
+        </Link>
+        <p className="truncate text-sm" style={{ color: "var(--color-muted)" }}>
+          {sousTitre}
+        </p>
+      </div>
+      <span
+        className="text-sm"
+        style={{ color: etat.alerte ? "var(--color-danger)" : "#3b4452", fontWeight: etat.alerte ? 600 : 500 }}
+      >
+        {etat.texte}
+      </span>
+      <Link href={href} className={principale ? "btn btn-primary" : "btn btn-outline"}>
+        {action}
+      </Link>
+    </li>
   );
 }
