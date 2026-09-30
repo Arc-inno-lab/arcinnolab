@@ -176,7 +176,9 @@ export type NotificationType =
   | "projet"
   // Parcours configurable (cf. migration 018).
   | "etape_a_valider"
-  | "rendez_vous";
+  | "rendez_vous"
+  // Mention dans le fil interne d'une demande (cf. migration 021).
+  | "mention";
 
 export interface AppNotification {
   id: string;
@@ -198,11 +200,13 @@ export type Persona =
   | "dirigeant_pme_eti"
   | "intrapreneur_territorial"
   | "etudiant_entrepreneur"
-  | "pme_familiale";
+  | "pme_familiale"
+  | "autre";
 
 export type DemandeStatut =
   | "nouvelle"
   | "en_accueil"
+  | "en_qualification"
   | "orientee"
   | "en_attente_comite"
   | "en_instruction"
@@ -319,6 +323,12 @@ export interface DemandeAccueil {
   profil_cree_id: string | null;
   /** Message communiqué au porteur avec la décision, toujours relu par un humain. */
   message_porteur: string | null;
+  // Qualification (migration 021) : un partenaire juge si le projet colle à
+  // l'ADN d'ArcInnoLab, puis choisit la suite.
+  adn_arcinnolab: boolean | null;
+  qualifie_par: string | null;
+  qualifie_le: string | null;
+  persona_precision: string | null;
   created_at: string;
   updated_at: string;
   coach?: Pick<Profile, "nom" | "prenom" | "photo_url"> | null;
@@ -343,6 +353,22 @@ export interface Promotion {
   date_comite: string | null;
   ouverte: boolean;
   created_at: string;
+  // Ajoutés en migration 021.
+  description: string | null;
+  date_debut: string | null;
+  date_fin: string | null;
+  places: number | null;
+}
+
+/** Message du fil interne de l'équipe sur une demande. Le porteur ne le voit jamais. */
+export interface NoteDemande {
+  id: string;
+  demande_id: string;
+  auteur_id: string;
+  contenu: string;
+  mentions: string[];
+  created_at: string;
+  auteur?: Pick<Profile, "nom" | "prenom" | "photo_url"> | null;
 }
 
 export const PAYS_LABELS: Record<Pays, string> = {
@@ -362,6 +388,7 @@ export const PERSONA_LABELS: Record<Persona, string> = {
   intrapreneur_territorial: "Intrapreneur·e territorial·e",
   etudiant_entrepreneur: "Étudiant·e-entrepreneur·e",
   pme_familiale: "PME familiale",
+  autre: "Autre",
 };
 
 export const PERSONA_DESCRIPTIONS: Record<Persona, string> = {
@@ -377,14 +404,16 @@ export const PERSONA_DESCRIPTIONS: Record<Persona, string> = {
     "En idéation ou première preuve de concept. A besoin d'un mentor et d'un droit à l'erreur, pas d'un comité de sélection.",
   pme_familiale:
     "Entreprise établie, souvent en transmission. Veut des preuves que ça marche ailleurs avant de s'engager : le pair-à-pair convainc mieux qu'un argumentaire.",
+  autre: "Aucun des six profils ne convient : précisez en quelques mots ce qui caractérise ce porteur.",
 };
 
 export const DEMANDE_STATUT_LABELS: Record<DemandeStatut, string> = {
   nouvelle: "Nouvelle",
-  en_accueil: "En accueil",
+  en_accueil: "Prise en charge",
+  en_qualification: "En qualification",
   orientee: "Orientée",
   en_attente_comite: "En attente du comité",
-  en_instruction: "En instruction",
+  en_instruction: "Au vote",
   admise: "Admise",
   non_retenue: "Non retenue",
   close: "Close",
@@ -395,6 +424,7 @@ export const DEMANDE_STATUT_COLORS: Record<DemandeStatut, string> = {
   // une alerte. C'est son ancienneté, affichée à part, qui peut l'être.
   nouvelle: "#3b4452",
   en_accueil: "var(--color-primary-2)",
+  en_qualification: "#1e6b8f",
   orientee: "var(--color-success)",
   en_attente_comite: "var(--color-warning, #c98b1e)",
   en_instruction: "#7c5cbf",
@@ -417,6 +447,7 @@ export const ORIENTATION_ISSUE_LABELS: Record<OrientationIssue, string> = {
 export const DEMANDE_STATUTS_ACTIFS: DemandeStatut[] = [
   "nouvelle",
   "en_accueil",
+  "en_qualification",
   "en_attente_comite",
   "en_instruction",
 ];

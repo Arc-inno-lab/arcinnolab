@@ -41,6 +41,7 @@ function numeroEtape(s: Suivi): number {
     case "nouvelle":
       return 1;
     case "en_accueil":
+    case "en_qualification":
       return 2;
     case "orientee":
     case "en_attente_comite":
@@ -56,6 +57,7 @@ function grandTitre(s: Suivi): string {
     case "nouvelle":
       return "Votre demande est bien arrivée";
     case "en_accueil":
+    case "en_qualification":
       return "Votre demande est entre de bonnes mains";
     case "orientee":
       return "Vous avez été mis en relation";
@@ -100,6 +102,14 @@ function etat(s: Suivi): { titre: string; texte: string; aFaire: string; couleur
         texte:
           "Votre dossier a un interlocuteur. Il prend connaissance de votre projet et vous contacte pour un premier échange.",
         aFaire: "Guettez son message. Si vous ne recevez rien sous une semaine, relancez-nous.",
+        couleur: "var(--color-primary-2)",
+      };
+    case "en_qualification":
+      return {
+        titre: "Votre interlocuteur étudie votre projet avec vous",
+        texte:
+          "Il fait le point avec vous pour comprendre votre projet et voir comment ArcInnoLab peut vous aider : une mise en relation directe, ou une candidature à une promotion d'accompagnement.",
+        aFaire: "Répondez-lui ici ou par téléphone : c'est cet échange qui décide de la suite.",
         couleur: "var(--color-primary-2)",
       };
     case "orientee":

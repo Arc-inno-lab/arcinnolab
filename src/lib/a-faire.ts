@@ -35,8 +35,19 @@ export type ElementProjetAFaire = {
   urgence: number;
 };
 
+/** Une demande que je dois faire avancer : la qualifier, ou trancher après le vote. */
+export type SuiteAFaire = {
+  id: string;
+  titre: string;
+  porteur: string;
+  detail: string;
+  action: string;
+  ancre: string;
+};
+
 export type AFaire = {
   demandes: DemandeAFaire[];
+  suites: SuiteAFaire[];
   avis: AvisAFaire[];
   projets: ElementProjetAFaire[];
   total: number;
@@ -53,13 +64,21 @@ const JOUR = 86_400_000;
  * chargement des données, pas du rendu.
  */
 export async function chargerAFaire(supabase: Client, userId: string, role: UserRole): Promise<AFaire> {
-  const vide: AFaire = { demandes: [], avis: [], projets: [], total: 0 };
+  const vide: AFaire = { demandes: [], suites: [], avis: [], projets: [], total: 0 };
   if (role === "porteur") return vide;
 
   const maintenant = Date.now();
   const aujourdhui = aujourdhuiIso(maintenant);
 
-  const [{ data: demandes }, { data: tours }, { data: mesVotes }, { data: tousProjets }, { data: rattachements }] =
+  const [
+    { data: demandes },
+    { data: tours },
+    { data: mesVotes },
+    { data: tousProjets },
+    { data: rattachements },
+    { data: enCours },
+    { data: toursClos },
+  ] =
     await Promise.all([
       supabase
         .from("demandes_accueil")
@@ -74,11 +93,57 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
       supabase.from("votes").select("tour_id").eq("votant_id", userId),
       supabase.from("projets").select("id, titre, id_partenaire_createur, etat"),
       supabase.from("projet_partenaire").select("projet_id").eq("partenaire_id", userId),
+      supabase
+        .from("demandes_accueil")
+        .select("id, titre_projet, prenom, nom, statut, coach_id")
+        .in("statut", ["en_accueil", "en_qualification", "en_attente_comite"])
+        // Les miennes, et celles dont plus personne n'assure le suivi.
+        .or(`coach_id.eq.${userId},coach_id.is.null`),
+      role === "admin"
+        ? supabase
+            .from("tours_vote")
+            .select("demande_id, statut, created_at, demande:demandes_accueil!inner(titre_projet, prenom, nom, statut)")
+            .in("statut", ["en_cours", "complet", "clos"])
+            .eq("demande.statut", "en_instruction")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] as never[] }),
     ]);
 
   const dejaVote = new Set((mesVotes ?? []).map((v) => v.tour_id as string));
 
+  // Seul le vote le plus récent de chaque demande compte : un ancien vote
+  // clos ne doit pas réclamer une décision quand un nouveau est en cours.
+  const vus = new Set<string>();
+  const derniersTours = (toursClos ?? []).filter((t) => {
+    if (vus.has(t.demande_id as string)) return false;
+    vus.add(t.demande_id as string);
+    return t.statut === "clos";
+  });
+
+  const suites: SuiteAFaire[] = [
+    ...derniersTours.map((t) => {
+      const d = (Array.isArray(t.demande) ? t.demande[0] : t.demande) as { titre_projet: string; prenom: string; nom: string };
+      return {
+        id: t.demande_id as string,
+        titre: d.titre_projet,
+        porteur: `${d.prenom} ${d.nom}`,
+        detail: "Vote clos : décision à prononcer",
+        action: "Décider",
+        ancre: "#decision",
+      };
+    }),
+    ...(enCours ?? []).map((d) => ({
+      id: d.id as string,
+      titre: d.titre_projet as string,
+      porteur: `${d.prenom} ${d.nom}`,
+      detail: d.statut === "en_accueil" ? "Prise en charge : appel de qualification à faire" : "À qualifier : ADN et choix de la suite",
+      action: "Qualifier",
+      ancre: d.statut === "en_accueil" ? "" : "#qualification",
+    })),
+  ];
+
   const resultat: AFaire = {
+    suites,
     demandes: (demandes ?? []).map((d) => ({
       ...d,
       joursAttente: Math.floor((maintenant - new Date(d.created_at).getTime()) / JOUR),
@@ -171,6 +236,6 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
     resultat.projets.sort((a, b) => a.urgence - b.urgence);
   }
 
-  resultat.total = resultat.demandes.length + resultat.avis.length + resultat.projets.length;
+  resultat.total = resultat.demandes.length + resultat.suites.length + resultat.avis.length + resultat.projets.length;
   return resultat;
 }

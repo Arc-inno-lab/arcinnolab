@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ouvrirTourVote, voter, cloreTourVote, prononcerDecision } from "@/app/actions";
+import { voter, cloreTourVote, prononcerDecision } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
-import type { Promotion, TourVote, VotePosition } from "@/lib/types";
+import type { TourVote, VotePosition } from "@/lib/types";
 import { VOTE_LABELS, VOTE_COLORS, TOUR_STATUT_LABELS } from "@/lib/types";
 
 const champ = "w-full rounded-md border px-3 py-2 text-sm";
@@ -11,83 +11,6 @@ const bordure = { borderColor: "var(--color-border)" };
 
 function joursRestants(limite: string, maintenant: number): number {
   return Math.ceil((new Date(limite).getTime() - maintenant) / 86_400_000);
-}
-
-/** Ouverture d'une consultation, quand aucune n'est en cours. */
-export function OuvrirTour({
-  demandeId,
-  promotionId,
-  votantsAttendus,
-  promotions,
-}: {
-  demandeId: string;
-  promotionId: string | null;
-  votantsAttendus: number;
-  promotions: Promotion[];
-}) {
-  const [state, action, pending] = useActionState(ouvrirTourVote, {});
-
-  return (
-    <form action={action} className="card p-5">
-      <h2 className="mb-1 text-lg font-medium">Consulter les partenaires</h2>
-      <p className="mb-4 text-sm" style={{ color: "var(--color-muted)" }}>
-        Ouvre une consultation de <strong>cinq jours</strong> auprès des{" "}
-        {votantsAttendus} partie{votantsAttendus > 1 ? "s" : ""} prenante
-        {votantsAttendus > 1 ? "s" : ""}. Les avis recueillis préparent la
-        décision du comité mixte : ils ne la remplacent pas.
-      </p>
-
-      {votantsAttendus < 2 && (
-        <p
-          className="mb-4 rounded-md p-3 text-sm"
-          style={{ background: "var(--color-surface-alt)" }}
-        >
-          Un seul compte peut voter aujourd&apos;hui. Invitez les partenaires du
-          consortium depuis <strong>Inviter</strong> pour que la consultation ait
-          du sens — mais vous pouvez déjà l&apos;ouvrir pour essayer.
-        </p>
-      )}
-
-      <input type="hidden" name="demande_id" value={demandeId} />
-
-      {promotions.length > 0 && (
-        <>
-          <label htmlFor="promotion_id" className="mb-1 block text-sm font-medium">
-            Rattacher à une promotion
-          </label>
-          <select
-            id="promotion_id"
-            name="promotion_id"
-            defaultValue={promotionId ?? ""}
-            className={champ}
-            style={bordure}
-          >
-            <option value="">Sans promotion pour l&apos;instant</option>
-            {promotions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nom}
-                {p.date_comite
-                  ? ` — comité le ${new Date(p.date_comite).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
-                  : ""}
-              </option>
-            ))}
-          </select>
-          <p className="mb-4 mt-1 text-xs" style={{ color: "var(--color-muted)" }}>
-            Facultatif : le rattachement peut se faire après la consultation.
-          </p>
-        </>
-      )}
-
-      {promotions.length === 0 && (
-        <input type="hidden" name="promotion_id" value="" />
-      )}
-
-      <FieldError message={state.error} />
-      <button type="submit" disabled={pending} className="btn btn-primary mt-2">
-        {pending ? "…" : "Ouvrir la consultation"}
-      </button>
-    </form>
-  );
 }
 
 /** Le tour en cours : le bulletin de la personne connectée, et l'état général. */

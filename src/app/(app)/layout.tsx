@@ -47,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: "/", label: "À faire", badge: aFaire.total, badgeFort: true },
       { href: "/demandes", label: "Demandes" },
       { href: "/projets", label: "Projets" },
+      { href: "/promotions", label: "Promotions" },
       { href: "/messages", label: "Messages", badge: messagesNonLus ?? 0 },
     ];
     if (profile.role === "admin") items.push({ href: "/admin", label: "Administration" });

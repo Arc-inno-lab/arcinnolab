@@ -44,18 +44,21 @@ export function EquipeProjet({
 
   return (
     <section aria-label="Qui travaille sur ce projet" className="card h-full p-5">
-      <div className="grid gap-5 sm:grid-cols-2 sm:divide-x" style={{ borderColor: "#eef1f6" }}>
+      <div className="flex flex-col gap-5">
         {/* ── Porteurs ── */}
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold">
-              Porteurs ({membres.length + invitations.length})
+              Porteurs{" "}
+              <span className="font-normal" style={{ color: "var(--color-muted)" }}>
+                {membres.length + invitations.length}
+              </span>
             </h3>
             {peutGerer && (
               <button
                 type="button"
                 onClick={() => setTiroir("porteur")}
-                className="btn btn-outline text-xs"
+                className="text-sm font-semibold" style={{ color: "var(--color-primary)", minHeight: 32 }}
               >
                 + Inviter
               </button>
@@ -109,16 +112,19 @@ export function EquipeProjet({
         </div>
 
         {/* ── Partenaires ── */}
-        <div className="sm:pl-5">
+        <div className="border-t pt-4" style={{ borderColor: "#eef1f6" }}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold">
-              Partenaires ({partenaires.length + (referent ? 1 : 0)})
+              Partenaires{" "}
+              <span className="font-normal" style={{ color: "var(--color-muted)" }}>
+                {partenaires.length + (referent ? 1 : 0)}
+              </span>
             </h3>
             {peutGerer && (
               <button
                 type="button"
                 onClick={() => setTiroir("partenaire")}
-                className="btn btn-outline text-xs"
+                className="text-sm font-semibold" style={{ color: "var(--color-primary)", minHeight: 32 }}
               >
                 Gérer
               </button>

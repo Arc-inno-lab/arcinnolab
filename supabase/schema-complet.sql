@@ -2369,3 +2369,108 @@ as $$
 $$;
 
 grant execute on function public.get_suivi_demande(uuid) to anon, authenticated;
+
+-- ============================================================
+-- 20260930200000_020_statut_qualification.sql
+-- ============================================================
+-- 020 — Nouvelles valeurs d'énumération pour le parcours de qualification.
+-- (ALTER TYPE … ADD VALUE doit rester dans une migration à part.)
+
+-- Une demande prise en charge passe en « qualification » : l'appel avec le
+-- porteur, puis la décision d'un partenaire (refus, orientation, vote).
+alter type public.demande_statut add value if not exists 'en_qualification' after 'en_accueil';
+
+-- Un profil qui n'entre dans aucune des six cases du document « Persona ».
+alter type public.persona add value if not exists 'autre';
+
+-- ============================================================
+-- 20260930200100_021_qualification_fil_interne_promotions.sql
+-- ============================================================
+-- 021 — Qualification des demandes, fil interne de l'équipe, promotions.
+
+-- ── Qualification ──────────────────────────────────────────────────────────
+-- Un partenaire qualifie la demande : colle-t-elle à l'ADN d'ArcInnoLab ?
+-- Puis il choisit la suite (refus, orientation, vote) ; ces suites existent
+-- déjà sous forme de statuts, d'orientations et de tours de vote.
+alter table public.demandes_accueil
+  add column if not exists adn_arcinnolab boolean,
+  add column if not exists qualifie_par uuid references public.profiles (id) on delete set null,
+  add column if not exists qualifie_le timestamptz,
+  add column if not exists persona_precision text
+    check (persona_precision is null or length(persona_precision) <= 200);
+
+-- ── Fil interne de l'équipe ────────────────────────────────────────────────
+-- Discussion entre membres de l'équipe sur une demande, avec mentions. Le
+-- porteur n'y a jamais accès : ni la page de suivi ni aucune fonction
+-- publique ne lit cette table.
+create table if not exists public.notes_demande (
+  id uuid primary key default gen_random_uuid(),
+  demande_id uuid not null references public.demandes_accueil (id) on delete cascade,
+  auteur_id uuid not null default auth.uid() references public.profiles (id) on delete cascade,
+  contenu text not null check (length(btrim(contenu)) between 1 and 4000),
+  mentions uuid[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists notes_demande_demande_idx on public.notes_demande (demande_id, created_at);
+
+alter table public.notes_demande enable row level security;
+
+create policy notes_demande_select on public.notes_demande for select to authenticated
+  using (public.get_my_role() in ('admin', 'partenaire'));
+
+create policy notes_demande_insert on public.notes_demande for insert to authenticated
+  with check (auteur_id = auth.uid() and public.get_my_role() in ('admin', 'partenaire'));
+
+create policy notes_demande_delete on public.notes_demande for delete to authenticated
+  using (auteur_id = auth.uid() or public.get_my_role() = 'admin');
+
+-- ── Promotions ─────────────────────────────────────────────────────────────
+alter table public.promotions
+  add column if not exists description text,
+  add column if not exists date_debut date,
+  add column if not exists date_fin date,
+  add column if not exists places integer check (places is null or places between 1 and 500);
+
+-- ============================================================
+-- 20260930210000_022_decision_reservee_admin.sql
+-- ============================================================
+-- 022 — La décision d'entrée en promotion est réservée à l'administrateur.
+--
+-- La politique de mise à jour des demandes laisse tout partenaire modifier
+-- une demande (il faut bien pouvoir la qualifier). Sans cette garde, un
+-- partenaire pourrait, depuis sa session, passer une demande en « admise » —
+-- ce qui ouvre le projet — ou sortir une demande du vote. Les actions de
+-- l'application le vérifient déjà ; la base le garantit.
+
+create or replace function public.proteger_decision_demande()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Les opérations de service (sans utilisateur connecté) ne sont pas visées.
+  if auth.uid() is null or new.statut is not distinct from old.statut then
+    return new;
+  end if;
+
+  if public.get_my_role() is distinct from 'admin' then
+    if new.statut = 'admise' then
+      raise exception 'Seul un administrateur peut admettre une demande.';
+    end if;
+    if old.statut = 'en_instruction' then
+      raise exception 'Une demande au vote ne change d''étape que par décision d''un administrateur.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.proteger_decision_demande() from public, anon, authenticated;
+
+drop trigger if exists demandes_decision_admin on public.demandes_accueil;
+create trigger demandes_decision_admin
+  before update of statut on public.demandes_accueil
+  for each row execute function public.proteger_decision_demande();

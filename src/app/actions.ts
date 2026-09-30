@@ -574,12 +574,15 @@ export async function prendreEnCharge(_prev: ActionResult, formData: FormData): 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Non authentifié." };
 
-  const { error } = await supabase
+  const { data: pris, error } = await supabase
     .from("demandes_accueil")
     .update({ coach_id: user.id, statut: "en_accueil" })
-    .eq("id", demandeId);
+    .eq("id", demandeId)
+    .eq("statut", "nouvelle")
+    .select("id");
 
   if (error) return { error: "Prise en charge impossible : " + error.message };
+  if (!pris?.length) return { error: "Quelqu'un vient de la prendre en charge : rechargez la page." };
 
   revalidatePath("/demandes");
   revalidatePath(`/demandes/${demandeId}`);
@@ -903,6 +906,14 @@ export async function prononcerDecision(_prev: ActionResult, formData: FormData)
   }
 
   const supabase = await createServerClient();
+  // La décision d'entrée en promotion revient à l'administrateur : le vote des
+  // partenaires est un avis qui l'éclaire, pas une décision.
+  const { data: { user: auteur } } = await supabase.auth.getUser();
+  const { data: role } = auteur
+    ? await supabase.from("profiles").select("role").eq("id", auteur.id).maybeSingle()
+    : { data: null };
+  if (role?.role !== "admin") return { error: "Seul un administrateur prononce la décision." };
+
   const { error } = await supabase
     .from("demandes_accueil")
     .update({ statut, message_porteur: message || null })

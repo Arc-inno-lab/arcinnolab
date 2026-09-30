@@ -9,6 +9,7 @@ import type {
   TourVote,
   Vote,
   MessageDemande,
+  NoteDemande,
 } from "@/lib/types";
 import {
   DEMANDE_STATUT_LABELS,
@@ -16,14 +17,19 @@ import {
   PAYS_LABELS,
   PERSONA_LABELS,
 } from "@/lib/types";
+import { BoutonPriseEnCharge } from "./TraitementDemande";
+import { TourEnCours, ProncerDecision } from "./TourDeVote";
 import {
-  BoutonPriseEnCharge,
-  FormQualification,
-  FormOrientation,
-  FormPromotion,
-  FormDecision,
-} from "./TraitementDemande";
-import { OuvrirTour, TourEnCours, ProncerDecision } from "./TourDeVote";
+  CarteQualification,
+  EtapePriseEnCharge,
+  ResumeQualification,
+  AbandonnerVote,
+  ReprendreSuivi,
+  Rouvrir,
+  SuiviOrientations,
+  type PartenaireChoix,
+} from "./Qualification";
+import { FilInterne, type Equipier } from "./FilInterne";
 import { Echange } from "./Echange";
 import { LienSuivi } from "./LienSuivi";
 import { APP_URL } from "@/lib/config";
@@ -35,6 +41,17 @@ export const dynamic = "force-dynamic";
  * interdit les appels impurs pendant le rendu, et à juste titre — leur résultat
  * change à chaque exécution. L'instant est capté une fois, puis transmis.
  */
+/** Date et heure formatées côté serveur, pour que le navigateur affiche la même chose. */
+function horodatage(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    timeZone: "Europe/Paris",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function instantCourant(): number {
   return Date.now();
 }
@@ -91,11 +108,34 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
     .limit(1)
     .returns<TourVote[]>();
 
-  const tour = tours?.[0] ?? null;
+  // Le vote ne compte que tant que la demande est au vote : une demande
+  // rouverte après un refus ne doit pas ressortir l'ancienne décision.
+  const tour = demande.statut === "en_instruction" ? (tours?.[0] ?? null) : null;
   const monVote =
     (tour?.votes ?? []).find((v: Vote) => v.votant_id === user!.id) ?? null;
 
-  const { data: votantsAttendus } = await supabase.rpc("nb_votants_attendus");
+  // L'équipe (admins et partenaires) : pour orienter vers un partenaire, et
+  // pour mentionner quelqu'un dans la discussion interne.
+  const [{ data: equipeProfils }, { data: notes }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, prenom, nom, organisation, role")
+      .in("role", ["admin", "partenaire"])
+      .order("prenom", { ascending: true }),
+    supabase
+      .from("notes_demande")
+      .select("*, auteur:profiles!notes_demande_auteur_id_fkey(nom, prenom, photo_url)")
+      .eq("demande_id", id)
+      .order("created_at", { ascending: true })
+      .returns<NoteDemande[]>(),
+  ]);
+  const equipe: Equipier[] = (equipeProfils ?? []).map((p) => ({ id: p.id, prenom: p.prenom, nom: p.nom }));
+  const partenairesChoix: PartenaireChoix[] = (equipeProfils ?? [])
+    .filter((p) => p.role === "partenaire")
+    .map((p) => ({ id: p.id, prenom: p.prenom, nom: p.nom, organisation: p.organisation }));
+  const qualificateur = demande.qualifie_par
+    ? (equipeProfils ?? []).find((p) => p.id === demande.qualifie_par)?.prenom ?? null
+    : null;
 
   const { data: messages } = await supabase
     .from("messages_demande")
@@ -120,14 +160,6 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
   const tourClos = tour && tour.statut === "clos";
   const decisionPrononcee = demande.statut === "admise" || demande.statut === "non_retenue";
 
-  // La consultation des partenaires est ouverte dès qu'un coach suit le
-  // dossier. Elle a d'abord été conditionnée au versement préalable dans une
-  // promotion : le résultat était une fonctionnalité invisible, enterrée
-  // derrière deux étapes que rien n'annonçait à l'écran. Consulter ses pairs
-  // sur un dossier n'a pas à dépendre de l'existence d'une promotion — le
-  // rattachement, lui, reste possible et utile, mais après coup.
-  const decisionPossible = demande.statut === "en_instruction" || decisionPrononcee;
-
   const deposee = new Date(demande.created_at);
   const maintenant = instantCourant();
 
@@ -136,14 +168,24 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
       ? Math.floor((maintenant - deposee.getTime()) / 86_400_000)
       : null;
 
-  const orientee = demande.statut === "orientee" || (orientations?.length ?? 0) > 0;
-  const troisieme = orientee && !tour ? "Orientation" : tour ? "Consultation des partenaires" : "Orientation ou consultation";
+  const enQualification = demande.statut === "en_qualification" || demande.statut === "en_attente_comite";
+  const aVote = !!tour || demande.statut === "en_instruction";
+  const orientee = demande.statut === "orientee";
+  const refusee = demande.statut === "non_retenue" || demande.statut === "close";
   const etapes: Array<{ label: string; fait: boolean }> = [
     { label: "Demande reçue", fait: true },
     { label: "Prise en charge", fait: !!demande.coach_id },
-    { label: troisieme, fait: orientee || !!tourClos || decisionPrononcee },
-    { label: "Décision", fait: decisionPrononcee || demande.statut === "orientee" },
-    { label: "Projet", fait: !!demande.projet_id },
+    {
+      label: "Qualification",
+      fait: aVote || orientee || refusee || demande.statut === "admise",
+    },
+    ...(orientee
+      ? [{ label: "Orientée vers un partenaire", fait: true }]
+      : [
+          { label: "Vote des partenaires", fait: !!tourClos || (decisionPrononcee && (tours?.length ?? 0) > 0) },
+          { label: "Décision", fait: decisionPrononcee },
+          { label: "Projet", fait: !!demande.projet_id },
+        ]),
   ];
   const courante = etapes.findIndex((e) => !e.fait);
   const frise = etapes.map((e, i) => ({
@@ -176,8 +218,10 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!demande.coach_id ? (
+          {demande.statut === "nouvelle" ? (
             <BoutonPriseEnCharge demandeId={demande.id} />
+          ) : !demande.coach_id && !["admise", "non_retenue", "close"].includes(demande.statut) ? (
+            <ReprendreSuivi demandeId={demande.id} />
           ) : demande.statut === "admise" && demande.projet_id ? (
             <Link href={`/projets/${demande.projet_id}`} className="btn btn-primary">
               Ouvrir le projet
@@ -190,9 +234,9 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             <a href="#decision" className="btn btn-primary">
               Prononcer la décision
             </a>
-          ) : !tour && !decisionPrononcee && demande.statut !== "orientee" && demande.statut !== "close" ? (
-            <a href="#traitement" className="btn btn-primary">
-              Orienter ou consulter
+          ) : enQualification ? (
+            <a href="#qualification" className="btn btn-primary">
+              Qualifier
             </a>
           ) : (
             <span
@@ -256,48 +300,53 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             monPrenom={profile?.prenom ?? ""}
           />
 
-          {!demande.coach_id ? null : (
+          {demande.statut === "nouvelle" ? null : (
             <div id="traitement" className="flex scroll-mt-6 flex-col gap-5">
-              <FormQualification demande={demande} />
-              <FormOrientation demandeId={demande.id} orientations={orientations ?? []} />
-
-              {!decisionPossible && (
-                <FormPromotion demandeId={demande.id} promotions={promotions ?? []} />
+              {demande.statut === "en_accueil" && (
+                <EtapePriseEnCharge demandeId={demande.id} prenomPorteur={demande.prenom} />
               )}
 
-              {/* Instruction collégiale : consultation, puis décision. */}
-              {!tour && !decisionPrononcee && (
-                <OuvrirTour
-                  demandeId={demande.id}
-                  promotionId={demande.promotion_id}
-                  votantsAttendus={votantsAttendus ?? 1}
+              {enQualification && (
+                <CarteQualification
+                  demande={demande}
+                  partenaires={partenairesChoix}
                   promotions={promotions ?? []}
+                  qualificateur={qualificateur}
                 />
+              )}
+
+              {!enQualification && demande.statut !== "en_accueil" && (
+                <ResumeQualification demande={demande} qualificateur={qualificateur} />
+              )}
+
+              {orientee && (orientations?.length ?? 0) > 0 && (
+                <SuiviOrientations demandeId={demande.id} orientations={orientations ?? []} />
               )}
 
               {tourOuvert && (
                 <div id="consultation" className="scroll-mt-6">
-                <TourEnCours
-                  tour={tour!}
-                  demandeId={demande.id}
-                  monVote={monVote}
-                  estAdmin={estAdmin}
-                  maintenant={maintenant}
-                />
+                  <TourEnCours tour={tour!} demandeId={demande.id} monVote={monVote} estAdmin={estAdmin} maintenant={maintenant} />
                 </div>
               )}
 
-              {tourClos && estAdmin && !decisionPrononcee && (
+              {demande.statut === "en_instruction" && estAdmin && <AbandonnerVote demandeId={demande.id} />}
+
+              {tourClos && !decisionPrononcee && (
                 <div id="decision" className="scroll-mt-6">
-                <ProncerDecision
-                  tour={tour!}
-                  demandeId={demande.id}
-                  messageActuel={demande.message_porteur}
-                />
+                  {estAdmin ? (
+                    <ProncerDecision tour={tour!} demandeId={demande.id} messageActuel={demande.message_porteur} />
+                  ) : (
+                    <section className="card p-5">
+                      <h2 className="mb-1 text-lg font-semibold">Vote clos</h2>
+                      <p className="text-sm" style={{ color: "#3b4452" }}>
+                        Les avis sont rendus. L&apos;administrateur prononce la décision.
+                      </p>
+                    </section>
+                  )}
                 </div>
               )}
 
-              {decisionPrononcee && demande.message_porteur && (
+              {demande.message_porteur && !enQualification && (
                 <section className="card p-5">
                   <h2 className="mb-2 text-lg font-medium">Message communiqué au porteur</h2>
                   <p className="whitespace-pre-wrap text-sm">{demande.message_porteur}</p>
@@ -307,14 +356,23 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                 </section>
               )}
 
-              {!decisionPossible && (
-                <FormDecision demandeId={demande.id} statut={demande.statut} />
+              {(orientee || refusee) && (
+                <div>
+                  <Rouvrir demandeId={demande.id} />
+                </div>
               )}
             </div>
           )}
         </div>
 
         <aside className="flex flex-col gap-5">
+          <FilInterne
+            demandeId={demande.id}
+            notes={(notes ?? []).map((n) => ({ ...n, quand: horodatage(n.created_at) }))}
+            equipe={equipe}
+            moi={user!.id}
+          />
+
           <section className="card p-5">
             <h2 className="mb-3 text-lg font-medium">Contact</h2>
             <dl className="flex flex-col gap-2 text-sm">
@@ -384,7 +442,10 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                 <dt className="text-xs" style={{ color: "var(--color-muted)" }}>
                   Profil
                 </dt>
-                <dd>{demande.persona ? PERSONA_LABELS[demande.persona] : "Non déterminé"}</dd>
+                <dd>
+                  {demande.persona ? PERSONA_LABELS[demande.persona] : "Non déterminé"}
+                  {demande.persona === "autre" && demande.persona_precision ? ` : ${demande.persona_precision}` : ""}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs" style={{ color: "var(--color-muted)" }}>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-type Resultat = { error?: string; success?: boolean };
+type Resultat = { error?: string; success?: boolean; id?: string };
 
 /** Taille maximale d'un document envoyé depuis un formulaire (sous la limite de 4 Mo du serveur). */
 export const TAILLE_MAX_DOCUMENT = 3.8 * 1024 * 1024;
@@ -16,7 +16,7 @@ export const TAILLE_MAX_DOCUMENT = 3.8 * 1024 * 1024;
  */
 export function useEnvoi(
   action: (prev: Resultat, fd: FormData) => Promise<Resultat>,
-  options?: { vider?: boolean; onSucces?: (form: HTMLFormElement, fd: FormData) => void }
+  options?: { vider?: boolean; onSucces?: (form: HTMLFormElement, fd: FormData, resultat: Resultat) => void }
 ) {
   const [pending, startTransition] = useTransition();
   const [resultat, setResultat] = useState<Resultat | null>(null);
@@ -38,7 +38,7 @@ export function useEnvoi(
       setResultat(r);
       if (!r.error) {
         if (options?.vider !== false) form.reset();
-        options?.onSucces?.(form, fd);
+        options?.onSucces?.(form, fd, r);
       }
     });
   }

@@ -89,6 +89,19 @@ export default async function AFairePage() {
             ))}
           </Bloc>
 
+          <Bloc titre="Demandes à faire avancer" lien={{ href: "/demandes?vue=miennes", label: "Celles que je suis" }} vide="Aucune demande n'attend de qualification de votre part.">
+            {aFaire.suites.map((d) => (
+              <Ligne
+                key={d.id + d.ancre}
+                href={`/demandes/${d.id}${d.ancre}`}
+                titre={d.titre}
+                sousTitre={d.porteur}
+                etat={{ texte: d.detail }}
+                action={d.action}
+              />
+            ))}
+          </Bloc>
+
           <Bloc titre="Votre avis est attendu" note="Tous les partenaires doivent se prononcer" vide="Aucune consultation n'attend votre avis.">
             {aFaire.avis.map((a) => (
               <Ligne
