@@ -51,6 +51,10 @@ function horodatage(iso: string) {
   });
 }
 
+function tailleLisible(octets: number) {
+  return octets >= 1024 * 1024 ? `${(octets / 1024 / 1024).toFixed(1).replace(".", ",")} Mo` : `${Math.max(1, Math.round(octets / 1024))} Ko`;
+}
+
 function instantCourant(): number {
   return Date.now();
 }
@@ -135,6 +139,33 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
   const qualificateur = demande.qualifie_par
     ? (equipeProfils ?? []).find((p) => p.id === demande.qualifie_par)?.prenom ?? null
     : null;
+
+  // Ouvrir la fiche, c'est avoir vu ce que le porteur a envoyé.
+  await supabase
+    .from("notifications")
+    .update({ lu: true })
+    .eq("user_id", user!.id)
+    .eq("lu", false)
+    .like("lien", `/demandes/${id}%`);
+
+  // Les documents joints par le porteur, dans l'espace privé : chaque lien
+  // d'ouverture est signé et expire au bout d'une heure.
+  const { data: docs } = await supabase
+    .from("documents_demande")
+    .select("id, nom, taille, chemin, created_at")
+    .eq("demande_id", id)
+    .is("retire_le", null)
+    .order("created_at", { ascending: true });
+  const { data: signes } = docs?.length
+    ? await supabase.storage.from("demandes-documents").createSignedUrls(docs.map((d) => d.chemin as string), 3600)
+    : { data: [] };
+  const documents = (docs ?? []).map((d, i) => ({
+    id: d.id as string,
+    nom: d.nom as string,
+    taille: d.taille as number,
+    quand: horodatage(d.created_at as string),
+    url: signes?.[i]?.signedUrl ?? null,
+  }));
 
   const { data: messages } = await supabase
     .from("messages_demande")
@@ -288,6 +319,34 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
           <section className="card p-5">
             <h2 className="mb-3 text-lg font-medium">Ce que le porteur a écrit</h2>
             <p className="whitespace-pre-wrap text-sm">{demande.description}</p>
+
+            <div id="documents" className="mt-4 scroll-mt-6 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+              <h3 className="mb-2 text-sm font-semibold">
+                Documents joints{documents.length ? ` (${documents.length})` : ""}
+              </h3>
+              {documents.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                  Aucun pour l&apos;instant. {demande.prenom} peut en ajouter depuis sa page de suivi.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {documents.map((d) => (
+                    <li key={d.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                      {d.url ? (
+                        <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-medium underline">
+                          {d.nom}
+                        </a>
+                      ) : (
+                        <span className="font-medium">{d.nom}</span>
+                      )}
+                      <span className="text-xs" style={{ color: "var(--color-muted)" }}>
+                        {tailleLisible(d.taille)} · {d.quand}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
 
           <Echange

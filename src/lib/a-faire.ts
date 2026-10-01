@@ -45,7 +45,17 @@ export type SuiteAFaire = {
   ancre: string;
 };
 
+/** Un porteur a écrit, ajouté un document ou corrigé sa demande, et je ne l'ai pas encore vu. */
+export type MessageAFaire = {
+  demandeId: string;
+  titre: string;
+  dernier: string;
+  nombre: number;
+  ancre: string;
+};
+
 export type AFaire = {
+  messages: MessageAFaire[];
   demandes: DemandeAFaire[];
   suites: SuiteAFaire[];
   avis: AvisAFaire[];
@@ -64,7 +74,7 @@ const JOUR = 86_400_000;
  * chargement des données, pas du rendu.
  */
 export async function chargerAFaire(supabase: Client, userId: string, role: UserRole): Promise<AFaire> {
-  const vide: AFaire = { demandes: [], suites: [], avis: [], projets: [], total: 0 };
+  const vide: AFaire = { messages: [], demandes: [], suites: [], avis: [], projets: [], total: 0 };
   if (role === "porteur") return vide;
 
   const maintenant = Date.now();
@@ -78,6 +88,7 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
     { data: rattachements },
     { data: enCours },
     { data: toursClos },
+    { data: notifsPorteurs },
   ] =
     await Promise.all([
       supabase
@@ -107,6 +118,15 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
             .eq("demande.statut", "en_instruction")
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] as never[] }),
+      // Ce que les porteurs ont envoyé aux personnes qui suivent leur demande.
+      supabase
+        .from("notifications")
+        .select("titre, lien, created_at")
+        .eq("user_id", userId)
+        .eq("type", "message_demande")
+        .eq("lu", false)
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
 
   const dejaVote = new Set((mesVotes ?? []).map((v) => v.tour_id as string));
@@ -142,7 +162,28 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
     })),
   ];
 
+  // Un seul élément par demande : le plus récent, avec le nombre de nouveautés.
+  const parDemande = new Map<string, MessageAFaire>();
+  for (const n of notifsPorteurs ?? []) {
+    const m = /^\/demandes\/([0-9a-f-]{36})(#[a-z-]+)?$/.exec((n.lien as string | null) ?? "");
+    if (!m) continue;
+    const deja = parDemande.get(m[1]);
+    if (deja) deja.nombre += 1;
+    else parDemande.set(m[1], { demandeId: m[1], titre: "", dernier: n.titre as string, nombre: 1, ancre: m[2] ?? "#echange" });
+  }
+  if (parDemande.size) {
+    const { data: titres } = await supabase
+      .from("demandes_accueil")
+      .select("id, titre_projet")
+      .in("id", [...parDemande.keys()]);
+    for (const t of titres ?? []) {
+      const m = parDemande.get(t.id as string);
+      if (m) m.titre = t.titre_projet as string;
+    }
+  }
+
   const resultat: AFaire = {
+    messages: [...parDemande.values()].filter((m) => m.titre),
     suites,
     demandes: (demandes ?? []).map((d) => ({
       ...d,
@@ -236,6 +277,6 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
     resultat.projets.sort((a, b) => a.urgence - b.urgence);
   }
 
-  resultat.total = resultat.demandes.length + resultat.suites.length + resultat.avis.length + resultat.projets.length;
+  resultat.total = resultat.messages.length + resultat.demandes.length + resultat.suites.length + resultat.avis.length + resultat.projets.length;
   return resultat;
 }

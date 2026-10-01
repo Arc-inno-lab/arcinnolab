@@ -45,7 +45,7 @@ export function Echange({
   });
 
   return (
-    <section className="card p-5">
+    <section id="echange" className="card scroll-mt-6 p-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-medium">Échanges avec {prenomPorteur}</h2>
         <span className="text-xs" style={{ color: "var(--color-muted)" }}>

@@ -71,6 +71,22 @@ export default async function AFairePage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
+          {aFaire.messages.length > 0 && (
+            <Bloc titre="Les porteurs vous ont écrit" vide="">
+              {aFaire.messages.map((m, i) => (
+                <Ligne
+                  key={m.demandeId}
+                  href={`/demandes/${m.demandeId}${m.ancre}`}
+                  titre={m.titre}
+                  sousTitre={m.dernier}
+                  etat={{ texte: m.nombre > 1 ? `${m.nombre} nouveautés` : "Nouveau", alerte: true }}
+                  action="Lire et répondre"
+                  principale={i === 0}
+                />
+              ))}
+            </Bloc>
+          )}
+
           <Bloc titre="Demandes sans réponse" lien={{ href: "/demandes", label: "Toute la file" }} vide="Toutes les demandes ont un interlocuteur.">
             {aFaire.demandes.map((d, i) => (
               <Ligne

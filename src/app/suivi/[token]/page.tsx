@@ -5,6 +5,7 @@ import { Logo } from "@/components/Logo";
 import { InterregMention } from "@/components/InterregFooter";
 import type { DemandeStatut, MessageSuivi } from "@/lib/types";
 import { EchangePorteur } from "./EchangePorteur";
+import { VotreDemande, type DemandePorteur, type DocumentPorteur } from "./VotreDemande";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +188,22 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
   const { data: fil } = await supabase.rpc("get_messages_suivi", { p_token: token });
   const messages = (fil as MessageSuivi[] | null) ?? [];
 
+  // Sa demande telle qu'il l'a écrite, et la liste de ses documents. Les
+  // fichiers eux-mêmes ne sont lisibles que par l'équipe : le porteur garde
+  // ses originaux.
+  const [{ data: dem }, { data: docs }] = await Promise.all([
+    supabase.rpc("get_demande_porteur", { p_token: token }),
+    supabase.rpc("get_documents_suivi", { p_token: token }),
+  ]);
+  const demande = (dem as DemandePorteur[] | null)?.[0] ?? null;
+  const fichiers = (docs as { id: string; nom: string; taille: number; ajoute_le: string }[] | null) ?? [];
+  const documents: DocumentPorteur[] = fichiers.map((f) => ({
+    id: f.id,
+    nom: f.nom,
+    taille: f.taille,
+    quand: jour(f.ajoute_le),
+  }));
+
   return (
     <main id="main" className="mx-auto w-full max-w-2xl px-4 py-6 text-[17px] md:py-10">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -209,7 +226,7 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
           </Link>
         </div>
       ) : (
-        <Contenu suivi={suivi} token={token} messages={messages} />
+        <Contenu suivi={suivi} token={token} messages={messages} demande={demande} documents={documents} />
       )}
 
       <div className="mt-8">
@@ -219,7 +236,19 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
   );
 }
 
-function Contenu({ suivi, token, messages }: { suivi: Suivi; token: string; messages: MessageSuivi[] }) {
+function Contenu({
+  suivi,
+  token,
+  messages,
+  demande,
+  documents,
+}: {
+  suivi: Suivi;
+  token: string;
+  messages: MessageSuivi[];
+  demande: DemandePorteur | null;
+  documents: DocumentPorteur[];
+}) {
   const e = etat(suivi);
   const n = numeroEtape(suivi);
   const coach = suivi.coach_prenom;
@@ -233,6 +262,14 @@ function Contenu({ suivi, token, messages }: { suivi: Suivi; token: string; mess
       <h1 className="mb-1 text-[26px] font-bold leading-tight">{grandTitre(suivi)}</h1>
       <p className="mb-5 text-[15px]" style={{ color: "var(--color-muted)" }}>
         Votre demande : {suivi.titre_projet}
+        {demande && (
+          <>
+            {" · "}
+            <a href="#ma-demande" className="font-semibold underline" style={{ color: "var(--color-primary)" }}>
+              {demande.modifiable ? "la revoir, la compléter" : "la relire, ajouter un document"}
+            </a>
+          </>
+        )}
       </p>
 
       <section className="card mb-6 p-5">
@@ -321,6 +358,8 @@ function Contenu({ suivi, token, messages }: { suivi: Suivi; token: string; mess
       )}
 
       <EchangePorteur token={token} messages={messages} coach={coach} />
+
+      {demande && <VotreDemande token={token} demande={demande} documents={documents} interlocuteur={coach} />}
 
       <section className="card mb-6 p-5">
         <h2 className="mb-3 text-[18px] font-bold">La suite, en 4 étapes</h2>

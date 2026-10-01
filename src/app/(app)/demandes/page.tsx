@@ -21,7 +21,7 @@ function depuis(iso: string, maintenant: number) {
 type Tour = { id: string; demande_id: string; statut: string; votants_attendus: number; votes: { votant_id: string }[] };
 
 /** Prépare les cartes hors rendu : l'instant courant fait partie du chargement. */
-function preparer(demandes: DemandeAccueil[], tours: Tour[], moi: string): CarteDemande[] {
+function preparer(demandes: DemandeAccueil[], tours: Tour[], moi: string, nouveautes: Map<string, number>): CarteDemande[] {
   const maintenant = Date.now();
   const tourDe = new Map<string, Tour>();
   for (const t of tours) if (!tourDe.has(t.demande_id)) tourDe.set(t.demande_id, t);
@@ -45,6 +45,7 @@ function preparer(demandes: DemandeAccueil[], tours: Tour[], moi: string): Carte
         : null,
       voteClos: !!t && t.statut === "clos",
       misAJour: d.updated_at,
+      nouveautes: nouveautes.get(d.id) ?? 0,
     };
   });
 }
@@ -62,7 +63,7 @@ export default async function DemandesPage({ searchParams }: { searchParams: Pro
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>();
   if (profile?.role === "porteur") redirect("/mon-projet");
 
-  const [{ data: demandes }, { data: tours }] = await Promise.all([
+  const [{ data: demandes }, { data: tours }, { data: notifs }] = await Promise.all([
     supabase
       .from("demandes_accueil")
       .select("*, coach:profiles!demandes_accueil_coach_id_fkey(nom, prenom, photo_url)")
@@ -73,9 +74,21 @@ export default async function DemandesPage({ searchParams }: { searchParams: Pro
       .select("id, demande_id, statut, votants_attendus, votes(votant_id)")
       .order("created_at", { ascending: false })
       .returns<Tour[]>(),
+    supabase
+      .from("notifications")
+      .select("lien")
+      .eq("user_id", user!.id)
+      .eq("type", "message_demande")
+      .eq("lu", false),
   ]);
 
-  const toutes = preparer(demandes ?? [], tours ?? [], user!.id);
+  const nouveautes = new Map<string, number>();
+  for (const n of notifs ?? []) {
+    const id = /^\/demandes\/([0-9a-f-]{36})/.exec((n.lien as string | null) ?? "")?.[1];
+    if (id) nouveautes.set(id, (nouveautes.get(id) ?? 0) + 1);
+  }
+
+  const toutes = preparer(demandes ?? [], tours ?? [], user!.id, nouveautes);
   const avisAttendus = toutes.filter((c) => c.vote?.monAvisAttendu).length;
   const cartes =
     vue === "miennes" ? toutes.filter((c) => c.coachId === user!.id) : vue === "avis" ? toutes.filter((c) => c.vote?.monAvisAttendu) : toutes;

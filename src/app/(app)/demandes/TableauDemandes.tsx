@@ -21,6 +21,8 @@ export type CarteDemande = {
   vote: { exprimes: number; attendus: number; monAvisAttendu: boolean } | null;
   voteClos: boolean;
   misAJour: string;
+  /** Nouveautés du porteur (message, document, correction) que je n'ai pas vues. */
+  nouveautes: number;
 };
 
 type Colonne = {
@@ -181,6 +183,15 @@ export function TableauDemandes({ cartes }: { cartes: CarteDemande[] }) {
                       <span className="pastille" style={{ background: "#efeaff", color: "#5b4bb7" }}>
                         {c.vote.exprimes}/{c.vote.attendus} avis
                       </span>
+                    )}
+                    {c.nouveautes > 0 && (
+                      <Link
+                        href={`/demandes/${c.id}#echange`}
+                        className="pastille"
+                        style={{ background: "var(--color-danger)", color: "#fff" }}
+                      >
+                        {c.nouveautes > 1 ? `${c.nouveautes} nouveautés du porteur` : "Nouveau message du porteur"}
+                      </Link>
                     )}
                     {c.voteClos && c.statut === "en_instruction" && (
                       <span className="pastille" style={{ background: "#fdf1dc", color: "#7a4a00" }}>
