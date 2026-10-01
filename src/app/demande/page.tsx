@@ -44,7 +44,7 @@ export default function DemandePage() {
       <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur" style={{ borderColor: "#e8eef6" }}>
         <div className="vit-conteneur flex items-center justify-between gap-4 px-4 py-3">
           <a href="#haut" aria-label="ArcInnoLab, haut de page" className="shrink-0">
-            <img src="/brand/logo-arcinnolab.svg" alt="ArcInnoLab" className="h-14 w-auto md:h-16" />
+            <img src="/brand/logo-arcinnolab-serre.svg" alt="ArcInnoLab" className="h-12 w-auto md:h-14" />
           </a>
           <nav aria-label="Sections" className="hidden items-center gap-6 text-sm font-semibold lg:flex" style={{ color: "#3b4452" }}>
             <a href="#projet" style={{ color: "inherit" }}>Le projet</a>
@@ -68,7 +68,7 @@ export default function DemandePage() {
         <section id="haut" className="vit-hero vit-section" style={{ paddingTop: "3.5rem" }}>
           <div className="vit-conteneur grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <div>
-              <img src="/brand/logo-arcinnolab.svg" alt="ArcInnoLab" className="mb-6 h-28 w-auto md:h-36" />
+              <img src="/brand/logo-arcinnolab-serre.svg" alt="ArcInnoLab" className="mb-6 h-28 w-auto md:h-36" />
               <p className="vit-kicker">
                 <span aria-hidden="true">●</span> Guichet unique franco-suisse
               </p>
@@ -351,7 +351,7 @@ export default function DemandePage() {
       <footer className="border-t px-4 pb-28 pt-12 md:pb-12" style={{ borderColor: "#e8eef6" }}>
         <div className="vit-conteneur grid gap-10 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div>
-            <img src="/brand/logo-arcinnolab.svg" alt="ArcInnoLab" className="h-24 w-auto" />
+            <img src="/brand/logo-arcinnolab-serre.svg" alt="ArcInnoLab" className="h-20 w-auto" />
             <p className="mt-3 text-sm font-semibold" style={{ color: "var(--vit-navy)" }}>
               Tous ensemble pour les transitions !
             </p>

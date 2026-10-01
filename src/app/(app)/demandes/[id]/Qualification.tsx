@@ -8,7 +8,6 @@ import {
   enregistrerQualification,
   mettreAuVote,
   orienterVersPartenaire,
-  passerEnQualification,
   refuserDemande,
   rouvrirQualification,
 } from "@/app/actions-qualification";
@@ -35,29 +34,6 @@ function dateCourte(iso: string) {
 }
 
 /** Étape 2 : la demande a un interlocuteur, l'appel de qualification reste à faire. */
-export function EtapePriseEnCharge({ demandeId, prenomPorteur }: { demandeId: string; prenomPorteur: string }) {
-  const envoi = useEnvoi(passerEnQualification, { vider: false });
-  return (
-    <section className="card p-5" style={{ borderLeft: "4px solid var(--color-primary-2)" }}>
-      <p className="text-sm font-semibold" style={{ color: "var(--color-primary-2)" }}>
-        Étape en cours · Prise en charge
-      </p>
-      <h2 className="mt-1 text-lg font-semibold">Prochaine étape : l&apos;appel de qualification</h2>
-      <p className="mt-1 text-sm" style={{ color: "#3b4452" }}>
-        Échangez avec {prenomPorteur} (fil ci-dessus) et avec l&apos;équipe (discussion interne, à droite). Quand
-        l&apos;appel est calé ou fait, passez la demande en qualification : c&apos;est là qu&apos;on décide de la suite.
-      </p>
-      <form onSubmit={envoi.onSubmit} className="mt-3">
-        <input type="hidden" name="demande_id" value={demandeId} />
-        <button type="submit" disabled={envoi.pending} className="btn btn-primary">
-          {envoi.pending ? "…" : "Passer en qualification"}
-        </button>
-        <FieldError message={envoi.erreur} />
-      </form>
-    </section>
-  );
-}
-
 /**
  * Étape 3 : la qualification. D'abord ce qu'on sait (profil, notes d'appel,
  * ADN), ensuite la suite, en trois choix exclusifs.
@@ -82,12 +58,12 @@ export function CarteQualification({
   return (
     <section id="qualification" className="card scroll-mt-6 p-5" style={{ borderLeft: "4px solid #1e6b8f" }}>
       <p className="text-sm font-semibold" style={{ color: "#1e6b8f" }}>
-        Étape en cours · Qualification
+        Étape en cours · Prise en charge et qualification
       </p>
       <h2 className="mt-1 text-lg font-semibold">Ce projet colle-t-il à l&apos;ADN d&apos;ArcInnoLab ?</h2>
       <p className="mt-1 text-sm" style={{ color: "#3b4452" }}>
-        N&apos;importe quel partenaire peut qualifier. Après l&apos;appel avec le porteur : son profil, vos notes, votre
-        avis. Puis la suite, en un choix.
+        Appelez {demande.prenom} (ou écrivez-lui dans l&apos;échange ci-dessus), demandez l&apos;avis de l&apos;équipe
+        dans la discussion à droite, puis notez son profil et votre avis. La suite se décide en un choix.
       </p>
 
       <form onSubmit={fiche.onSubmit} className="mt-4 flex flex-col gap-4">

@@ -409,7 +409,7 @@ export const PERSONA_DESCRIPTIONS: Record<Persona, string> = {
 
 export const DEMANDE_STATUT_LABELS: Record<DemandeStatut, string> = {
   nouvelle: "Nouvelle",
-  en_accueil: "Prise en charge",
+  en_accueil: "En qualification",
   en_qualification: "En qualification",
   orientee: "Orientée",
   en_attente_comite: "En attente du comité",

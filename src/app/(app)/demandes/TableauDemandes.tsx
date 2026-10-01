@@ -34,12 +34,11 @@ type Colonne = {
 
 const COLONNES: Colonne[] = [
   { cle: "nouvelles", titre: "Nouvelles", aide: "Personne ne les suit encore", statuts: ["nouvelle"] },
-  { cle: "prise", titre: "Prise en charge", aide: "Premiers échanges", statuts: ["en_accueil"], cible: "en_accueil" },
   {
     cle: "qualification",
-    titre: "Qualification",
+    titre: "Prise en charge et qualification",
     aide: "Appel, ADN, choix de la suite",
-    statuts: ["en_qualification", "en_attente_comite"],
+    statuts: ["en_accueil", "en_qualification", "en_attente_comite"],
     cible: "en_qualification",
   },
   { cle: "vote", titre: "Au vote", aide: "Avis des partenaires, puis décision", statuts: ["en_instruction"] },

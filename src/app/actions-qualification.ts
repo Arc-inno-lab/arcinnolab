@@ -69,12 +69,12 @@ const EN_QUALIFICATION: DemandeStatut[] = ["en_accueil", "en_qualification", "en
 // ── Glisser-déposer dans le tableau des demandes ─────────────────────────────
 
 /**
- * Les seuls déplacements permis au glisser-déposer : faire avancer ou reculer
- * une demande entre Nouvelle, Prise en charge et Qualification. Les décisions
+ * Le seul déplacement permis au glisser-déposer : faire passer une demande
+ * nouvelle en qualification (ce qui la prend en charge). Les décisions
  * (refus, orientation, vote, admission) passent par la fiche, avec un motif.
  */
 export async function deplacerDemande(demandeId: string, cible: DemandeStatut): Promise<Resultat> {
-  if (!["en_accueil", "en_qualification"].includes(cible)) {
+  if (cible !== "en_qualification") {
     return { error: "Cette étape se décide depuis la fiche, avec un motif." };
   }
   const supabase = await createServerClient();
@@ -110,11 +110,6 @@ export async function reprendreSuivi(_prev: Resultat, formData: FormData): Promi
   if (error) return { error: error.message };
   rafraichir(demandeId);
   return { success: true };
-}
-
-/** Bouton « Passer en qualification » de la fiche. */
-export async function passerEnQualification(_prev: Resultat, formData: FormData): Promise<Resultat> {
-  return deplacerDemande(String(formData.get("demande_id") || ""), "en_qualification");
 }
 
 /** Rouvre une demande orientée, refusée ou close : elle revient en qualification. */

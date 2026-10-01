@@ -1,5 +1,5 @@
 -- ArcInnoLab — schéma complet, concaténation des migrations dans l'ordre.
--- Généré le 30/09/2026. À coller dans le SQL Editor de Supabase sur un projet VIERGE.
+-- Généré le 01/10/2026. À coller dans le SQL Editor de Supabase sur un projet VIERGE.
 -- Vérification d'intégrité de la source : voir CHECKSUMS.md5
 
 -- ============================================================
@@ -2474,3 +2474,16 @@ drop trigger if exists demandes_decision_admin on public.demandes_accueil;
 create trigger demandes_decision_admin
   before update of statut on public.demandes_accueil
   for each row execute function public.proteger_decision_demande();
+
+-- ============================================================
+-- 20261001090000_023_fusion_prise_en_charge.sql
+-- ============================================================
+-- 023 · « Prise en charge » et « Qualification » ne font plus qu'une étape.
+--
+-- Prendre en charge une demande la fait passer directement en qualification.
+-- Le statut « en_accueil » reste dans le type (on ne retire pas une valeur
+-- d'un enum Postgres), mais plus aucune demande ne le porte.
+
+update public.demandes_accueil
+   set statut = 'en_qualification'
+ where statut = 'en_accueil';

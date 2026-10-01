@@ -21,7 +21,6 @@ import { BoutonPriseEnCharge } from "./TraitementDemande";
 import { TourEnCours, ProncerDecision } from "./TourDeVote";
 import {
   CarteQualification,
-  EtapePriseEnCharge,
   ResumeQualification,
   AbandonnerVote,
   ReprendreSuivi,
@@ -129,7 +128,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
       .order("created_at", { ascending: true })
       .returns<NoteDemande[]>(),
   ]);
-  const equipe: Equipier[] = (equipeProfils ?? []).map((p) => ({ id: p.id, prenom: p.prenom, nom: p.nom }));
+  const equipe: Equipier[] = (equipeProfils ?? []).map((p) => ({ id: p.id, prenom: p.prenom, nom: p.nom, organisation: p.organisation }));
   const partenairesChoix: PartenaireChoix[] = (equipeProfils ?? [])
     .filter((p) => p.role === "partenaire")
     .map((p) => ({ id: p.id, prenom: p.prenom, nom: p.nom, organisation: p.organisation }));
@@ -168,15 +167,15 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
       ? Math.floor((maintenant - deposee.getTime()) / 86_400_000)
       : null;
 
-  const enQualification = demande.statut === "en_qualification" || demande.statut === "en_attente_comite";
+  // « en_accueil » est l'ancien statut « Prise en charge », désormais fondu dans la qualification.
+  const enQualification = ["en_accueil", "en_qualification", "en_attente_comite"].includes(demande.statut);
   const aVote = !!tour || demande.statut === "en_instruction";
   const orientee = demande.statut === "orientee";
   const refusee = demande.statut === "non_retenue" || demande.statut === "close";
   const etapes: Array<{ label: string; fait: boolean }> = [
     { label: "Demande reçue", fait: true },
-    { label: "Prise en charge", fait: !!demande.coach_id },
     {
-      label: "Qualification",
+      label: "Prise en charge et qualification",
       fait: aVote || orientee || refusee || demande.statut === "admise",
     },
     ...(orientee
@@ -284,8 +283,8 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
         ))}
       </ol>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-        <div className="flex flex-col gap-5">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-5">
           <section className="card p-5">
             <h2 className="mb-3 text-lg font-medium">Ce que le porteur a écrit</h2>
             <p className="whitespace-pre-wrap text-sm">{demande.description}</p>
@@ -302,10 +301,6 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
 
           {demande.statut === "nouvelle" ? null : (
             <div id="traitement" className="flex scroll-mt-6 flex-col gap-5">
-              {demande.statut === "en_accueil" && (
-                <EtapePriseEnCharge demandeId={demande.id} prenomPorteur={demande.prenom} />
-              )}
-
               {enQualification && (
                 <CarteQualification
                   demande={demande}
@@ -315,7 +310,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
                 />
               )}
 
-              {!enQualification && demande.statut !== "en_accueil" && (
+              {!enQualification && (
                 <ResumeQualification demande={demande} qualificateur={qualificateur} />
               )}
 
@@ -365,7 +360,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        <aside className="flex flex-col gap-5">
+        <aside className="flex min-w-0 flex-col gap-5">
           <FilInterne
             demandeId={demande.id}
             notes={(notes ?? []).map((n) => ({ ...n, quand: horodatage(n.created_at) }))}

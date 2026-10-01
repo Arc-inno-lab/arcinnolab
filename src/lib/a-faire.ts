@@ -136,9 +136,9 @@ export async function chargerAFaire(supabase: Client, userId: string, role: User
       id: d.id as string,
       titre: d.titre_projet as string,
       porteur: `${d.prenom} ${d.nom}`,
-      detail: d.statut === "en_accueil" ? "Prise en charge : appel de qualification à faire" : "À qualifier : ADN et choix de la suite",
+      detail: "À qualifier : appel au porteur, ADN et choix de la suite",
       action: "Qualifier",
-      ancre: d.statut === "en_accueil" ? "" : "#qualification",
+      ancre: "#qualification",
     })),
   ];
 

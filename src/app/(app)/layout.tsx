@@ -62,9 +62,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         className={`sticky top-0 z-30 border-b md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r ${porteur ? "max-md:hidden" : ""}`}
         style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 md:flex-col md:items-start md:gap-3">
-          <Link href={porteur ? "/mon-projet" : "/"} className="flex items-center gap-2">
-            <Logo />
+        <div className="flex items-center justify-between gap-3 px-4 py-2 md:justify-center md:px-5 md:pb-5 md:pt-6">
+          <Link href={porteur ? "/mon-projet" : "/"} aria-label="ArcInnoLab — accueil" className="md:flex md:w-full md:justify-center">
+            <Logo taille="menu" />
           </Link>
         </div>
 
@@ -101,7 +101,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
         >
           <Link href="/mon-projet" aria-label="Mon projet">
-            <Logo compact />
+            <Logo taille="petit" />
           </Link>
           <Link href="/profil" aria-label="Mon compte">
             <Avatar nom={profile.nom} prenom={profile.prenom} photoUrl={profile.photo_url} size="sm" />

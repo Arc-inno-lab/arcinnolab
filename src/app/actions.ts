@@ -576,7 +576,7 @@ export async function prendreEnCharge(_prev: ActionResult, formData: FormData): 
 
   const { data: pris, error } = await supabase
     .from("demandes_accueil")
-    .update({ coach_id: user.id, statut: "en_accueil" })
+    .update({ coach_id: user.id, statut: "en_qualification" })
     .eq("id", demandeId)
     .eq("statut", "nouvelle")
     .select("id");
@@ -688,21 +688,6 @@ export async function verserEnPromotion(_prev: ActionResult, formData: FormData)
   return { success: true };
 }
 
-/** Décision du comité, ou clôture d'une demande sans suite. */
-export async function deciderDemande(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  const demandeId = String(formData.get("demande_id") || "");
-  const statut = String(formData.get("statut") || "");
-  const permis = ["admise", "non_retenue", "close", "en_accueil"];
-  if (!demandeId || !permis.includes(statut)) return { error: "Décision invalide." };
-
-  const supabase = await createServerClient();
-  const { error } = await supabase.from("demandes_accueil").update({ statut }).eq("id", demandeId);
-  if (error) return { error: "Décision non enregistrée : " + error.message };
-
-  revalidatePath("/demandes");
-  revalidatePath(`/demandes/${demandeId}`);
-  return { success: true };
-}
 
 /** Création d'une promotion (réservée à l'Admin par la RLS). */
 export async function creerPromotion(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
