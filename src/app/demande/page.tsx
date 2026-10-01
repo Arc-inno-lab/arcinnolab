@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import "@fontsource-variable/inter";
 import { DemandeForm } from "./DemandeForm";
 import { BoutonMobile } from "./BoutonMobile";
-import { Pictogramme, Reseau } from "./Decor";
+import { Pictogramme } from "./Decor";
+import { CarteArc } from "./CarteArc";
 import {
   AVANTAGES,
   CHIFFRES,
@@ -13,8 +14,9 @@ import {
   FINANCEMENT,
   PARTENAIRES,
   PHOTOS,
-  PUBLICS,
   SOLUTIONS,
+  CONTACT_EMAIL,
+  LINKEDIN,
 } from "./contenu";
 
 export const metadata: Metadata = {
@@ -66,6 +68,7 @@ export default function DemandePage() {
         <section id="haut" className="vit-hero vit-section" style={{ paddingTop: "3.5rem" }}>
           <div className="vit-conteneur grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <div>
+              <img src="/brand/logo-arcinnolab.svg" alt="ArcInnoLab" className="mb-6 h-28 w-auto md:h-36" />
               <p className="vit-kicker">
                 <span aria-hidden="true">●</span> Guichet unique franco-suisse
               </p>
@@ -99,24 +102,16 @@ export default function DemandePage() {
               </ul>
             </div>
 
-            {/* Le logo en majesté, au centre du réseau qu'il dessine, entouré
-                des publics de l'affiche. */}
-            <div className="relative mx-auto aspect-square w-full max-w-[30rem]">
-              <Reseau className="absolute inset-0 h-full w-full" />
-              <div className="absolute inset-[16%] flex items-center justify-center rounded-full bg-white shadow-[0_20px_60px_rgba(24,61,122,0.18)]">
-                <img src="/brand/logo-arcinnolab.svg" alt="" className="vit-flotte w-[72%]" />
-              </div>
-              {PUBLICS.map((p, i) => {
-                const angle = (i / PUBLICS.length) * 2 * Math.PI - Math.PI / 2;
-                const x = 50 + 46 * Math.cos(angle);
-                const y = 50 + 46 * Math.sin(angle);
-                return (
-                  <span key={p} className="vit-orbite" style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}>
-                    {p}
-                  </span>
-                );
-              })}
-            </div>
+            {/* Le réseau de l'affiche : les partenaires et les publics qu'ArcInnoLab
+                relie, de part et d'autre de la frontière. */}
+            <figure className="relative mx-auto w-full max-w-[38rem]">
+              <img
+                src="/brand/vitrine/reseau-arcinnolab.webp"
+                alt="Le réseau ArcInnoLab : KMØ, Basel Area, Ville de Delémont, Haute École Arc et UTBM Crunchlab, reliés aux industries, associations, citoyens, étudiants et collectivités"
+                className="vit-flotte w-full"
+                style={{ maskImage: "linear-gradient(180deg, #000 78%, transparent)", WebkitMaskImage: "linear-gradient(180deg, #000 78%, transparent)" }}
+              />
+            </figure>
           </div>
         </section>
 
@@ -271,29 +266,10 @@ export default function DemandePage() {
             </p>
 
             <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-              <figure className="vit-carte relative overflow-hidden p-3">
-                <div className="relative">
-                  <img src="/brand/vitrine/carte-arc-jurassien.webp" alt="Carte de l'Arc jurassien, de Belfort à Delémont, entre France et Suisse" className="w-full" />
-                  <span className="vit-pin" style={{ left: "25.4%", top: "27.6%" }}>
-                    <span>Belfort · UTBM</span>
-                    <i />
-                  </span>
-                  <span className="vit-pin" style={{ left: "76%", top: "63.5%" }}>
-                    <span>Delémont · SAFED</span>
-                    <i />
-                  </span>
-                  <span className="vit-pin" style={{ left: "60%", top: "9%" }}>
-                    <span>↑ Mulhouse · KMØ</span>
-                  </span>
-                  <span className="vit-pin" style={{ left: "80%", top: "42%" }}>
-                    <span>↗ Bâle · Basel Area</span>
-                  </span>
-                  <span className="vit-pin" style={{ left: "36%", top: "99%" }}>
-                    <span>↓ Neuchâtel · HE-Arc</span>
-                  </span>
-                </div>
+              <figure className="vit-carte overflow-hidden p-3 lg:sticky lg:top-28">
+                <CarteArc />
                 <figcaption className="px-2 pb-1 pt-3 text-xs" style={{ color: "var(--color-muted)" }}>
-                  France en bleu, Suisse en rouge : l&apos;Arc jurassien, un territoire de part et d&apos;autre de la frontière.
+                  De Mulhouse à Neuchâtel, cinq lieux reliés par-dessus la frontière.
                 </figcaption>
               </figure>
 
@@ -359,6 +335,12 @@ export default function DemandePage() {
                   Dans tous les cas, vous repartez avec une réponse et un interlocuteur. C&apos;est notre engagement.
                 </p>
               </div>
+              <p className="mt-5 text-sm" style={{ color: "#3b4452" }}>
+                Une question avant de déposer ? Écrivez-nous :{" "}
+                <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold">
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
             </div>
             <DemandeForm />
           </div>
@@ -373,9 +355,21 @@ export default function DemandePage() {
             <p className="mt-3 text-sm font-semibold" style={{ color: "var(--vit-navy)" }}>
               Tous ensemble pour les transitions !
             </p>
-            <p className="mt-2 text-sm" style={{ color: "#3b4452" }}>
-              Suivez notre actualité sur LinkedIn : <strong>@arcinnolab</strong>
-            </p>
+            <ul className="mt-3 flex flex-col gap-2 text-sm">
+              <li>
+                <a href={LINKEDIN} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-semibold">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#0a66c2" aria-hidden="true">
+                    <path d="M20.4 3H3.6A.6.6 0 0 0 3 3.6v16.8c0 .3.3.6.6.6h16.8c.3 0 .6-.3.6-.6V3.6a.6.6 0 0 0-.6-.6ZM8.3 18.3H5.7V9.8h2.6v8.5ZM7 8.6a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm11.3 9.7h-2.6v-4.1c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.2h-2.6V9.8h2.5v1.2c.4-.7 1.2-1.4 2.5-1.4 2.7 0 3.2 1.8 3.2 4.1v4.6Z" />
+                  </svg>
+                  Suivre ArcInnoLab sur LinkedIn
+                </a>
+              </li>
+              <li>
+                <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold">
+                  {CONTACT_EMAIL}
+                </a>
+              </li>
+            </ul>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <Link href="/a-propos">À propos du projet</Link>
               <Link href="/login">Espace membres</Link>

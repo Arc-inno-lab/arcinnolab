@@ -154,3 +154,6 @@ export const PHOTOS = [
 
 export const FINANCEMENT =
   "Ce projet est soutenu par le programme de coopération territoriale européenne Interreg France-Suisse 2021-2027. Il bénéficie à ce titre du Fonds européen de développement régional (FEDER) à hauteur de 343 065 €, de fonds fédéraux à hauteur de 376 411 € et de fonds cantonaux suisses (Canton du Jura) pour un montant de 376 411 €.";
+
+export const CONTACT_EMAIL = "arcinnolab@gmail.com";
+export const LINKEDIN = "https://www.linkedin.com/showcase/arcinnolab";
