@@ -49,6 +49,9 @@ export async function proxy(request: NextRequest) {
     "/demande",
     "/suivi",
     "/reinitialiser",
+    // Le fichier « Ajouter à mon agenda » d'un événement : public pour les
+    // événements publics, la RLS refusant les autres à qui n'est pas connecté.
+    "/evenements",
   ];
 
   // La comparaison est volontairement stricte : chemin identique, ou suivi d'un

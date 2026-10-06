@@ -349,14 +349,7 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             </div>
           </section>
 
-          <Echange
-            demandeId={demande.id}
-            messages={messages ?? []}
-            prenomPorteur={demande.prenom}
-            emailPorteur={demande.email}
-            lienSuivi={lienSuivi}
-            monPrenom={profile?.prenom ?? ""}
-          />
+          <Echange demandeId={demande.id} messages={messages ?? []} prenomPorteur={demande.prenom} />
 
           {demande.statut === "nouvelle" ? null : (
             <div id="traitement" className="flex scroll-mt-6 flex-col gap-5">

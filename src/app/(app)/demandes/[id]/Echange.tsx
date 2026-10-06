@@ -8,41 +8,19 @@ import type { MessageDemande } from "@/lib/types";
 /**
  * Le fil d'échange entre l'équipe et le porteur, vu du côté équipe.
  *
- * Tant que la plateforme n'envoie pas d'e-mails, un porteur ne sait pas qu'on
- * lui a répondu. D'où la case « prévenir par e-mail » : elle ouvre la
- * messagerie de l'équipier avec un message déjà rédigé, qui contient le lien
- * de la page de suivi. Aucun réglage, aucun compte à brancher — un clic sur
- * « Envoyer » dans sa propre messagerie.
+ * Le porteur est prévenu de chaque réponse par un e-mail envoyé depuis
+ * l'adresse ArcInnoLab, avec le lien de sa page de suivi (migration 026).
  */
 export function Echange({
   demandeId,
   messages,
   prenomPorteur,
-  emailPorteur,
-  lienSuivi,
-  monPrenom,
 }: {
   demandeId: string;
   messages: MessageDemande[];
   prenomPorteur: string;
-  emailPorteur: string;
-  lienSuivi: string;
-  monPrenom: string;
 }) {
-  // La messagerie de l'équipier ne s'ouvre qu'une fois le message enregistré :
-  // inutile de prévenir le porteur d'une réponse qui n'existe pas.
-  const envoi = useEnvoi(repondreAuPorteur, {
-    onSucces: (_form, fd) => {
-      const texte = String(fd.get("contenu") || "").trim();
-      if (!fd.get("prevenir") || !texte) return;
-      const sujet = "Réponse à votre demande ArcInnoLab";
-      const corps =
-        `Bonjour ${prenomPorteur},\n\n${texte}\n\n` +
-        `Vous pouvez me répondre et suivre votre demande sur cette page :\n${lienSuivi}\n\n` +
-        `${monPrenom}\nArcInnoLab`;
-      window.location.href = `mailto:${encodeURIComponent(emailPorteur)}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}`;
-    },
-  });
+  const envoi = useEnvoi(repondreAuPorteur);
 
   return (
     <section id="echange" className="card scroll-mt-6 p-5">
@@ -106,10 +84,9 @@ export function Echange({
         />
         <FieldError message={envoi.erreur} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm" style={{ color: "#3b4452" }}>
-            <input type="checkbox" name="prevenir" defaultChecked style={{ width: 18, height: 18, minHeight: 0 }} />
-            Prévenir {prenomPorteur} par e-mail depuis ma messagerie
-          </label>
+          <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+            {prenomPorteur} est prévenu par e-mail, avec le lien de sa page de suivi.
+          </p>
           <button type="submit" disabled={envoi.pending} className="btn btn-primary">
             {envoi.pending ? "Envoi…" : "Envoyer"}
           </button>

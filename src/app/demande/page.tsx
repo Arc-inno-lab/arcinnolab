@@ -5,6 +5,9 @@ import { DemandeForm } from "./DemandeForm";
 import { BoutonMobile } from "./BoutonMobile";
 import { Pictogramme } from "./Decor";
 import { CarteArc } from "./CarteArc";
+import { createClient } from "@/lib/supabase/server";
+import { CarteEvenement } from "@/components/CarteEvenement";
+import type { Evenement } from "@/lib/types";
 import {
   AVANTAGES,
   CHIFFRES,
@@ -37,7 +40,26 @@ export const metadata: Metadata = {
  * Aucun compte n'est ouvert au dépôt : un accompagnateur prend contact, et
  * l'accès à la plateforme ne vient qu'ensuite.
  */
-export default function DemandePage() {
+/** Lecture de l'heure, hors du rendu (règle de pureté de React). */
+function instantCourant(): number {
+  return Date.now();
+}
+
+export default async function DemandePage() {
+  // Les prochains événements publics : la RLS ne laisse voir aux visiteurs
+  // que ceux que l'équipe a marqués « public ».
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("evenements")
+    .select("*")
+    .eq("public", true)
+    .eq("retire", false)
+    .gte("debut", new Date(instantCourant() - 3 * 3600_000).toISOString())
+    .order("debut", { ascending: true })
+    .limit(6)
+    .returns<Evenement[]>();
+  const evenements = data ?? [];
+
   return (
     <div className="vitrine">
       {/* ── En-tête ─────────────────────────────────────────────── */}
@@ -51,6 +73,9 @@ export default function DemandePage() {
             <a href="#fonctionnement" style={{ color: "inherit" }}>Comment ça marche</a>
             <a href="#solutions" style={{ color: "inherit" }}>Nos solutions</a>
             <a href="#partenaires" style={{ color: "inherit" }}>Partenaires</a>
+            {evenements.length > 0 && (
+              <a href="#agenda" style={{ color: "inherit" }}>Agenda</a>
+            )}
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className="hidden text-sm font-semibold sm:inline" style={{ color: "#3b4452" }}>
@@ -314,6 +339,25 @@ export default function DemandePage() {
             </div>
           </div>
         </section>
+
+        {/* ── Agenda ────────────────────────────────────────────── */}
+        {evenements.length > 0 && (
+          <section id="agenda" className="vit-section scroll-mt-20" style={{ background: "var(--vit-bleu-clair)" }}>
+            <div className="vit-conteneur">
+              <p className="vit-kicker">Agenda</p>
+              <h2 className="mt-2 max-w-3xl text-3xl font-bold md:text-4xl">Venez nous rencontrer</h2>
+              <p className="mt-4 max-w-3xl text-lg leading-relaxed" style={{ color: "#3b4452" }}>
+                Ateliers, challenges, conférences : les prochains rendez-vous ouverts à tous, de part et d&apos;autre de la
+                frontière.
+              </p>
+              <div className="mt-8 grid gap-4 lg:grid-cols-2">
+                {evenements.map((e) => (
+                  <CarteEvenement key={e.id} evenement={e} grand />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── Dépôt ─────────────────────────────────────────────── */}
         <section id="deposer" className="vit-section scroll-mt-20" style={{ background: "linear-gradient(180deg, #f3f7fd 0%, #e4edf8 100%)" }}>

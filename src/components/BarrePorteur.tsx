@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * La barre d'onglets du porteur sur téléphone : trois gros boutons en bas de
+ * La barre d'onglets du porteur sur téléphone : quatre gros boutons en bas de
  * l'écran, là où le pouce va sans réfléchir. Pas de menu à déplier — ceux
  * qui ne vivent pas dans les applications ne le trouvent pas.
  */
@@ -27,6 +27,17 @@ export function BarrePorteur() {
       label: "Messages",
       actif: pathname.startsWith("/mon-projet/messages"),
       icone: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />,
+    },
+    {
+      href: "/agenda",
+      label: "Agenda",
+      actif: pathname.startsWith("/agenda"),
+      icone: (
+        <>
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M3 10h18M8 3v4M16 3v4" />
+        </>
+      ),
     },
     {
       href: "/profil",

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { chargerMonProjet, type Personne } from "@/lib/mon-projet";
 import { aujourdhuiIso, estEnRetard, heure, jourCourt, jourLong, lireParcours, ordreParcours } from "@/lib/parcours";
-import { RDV_MODE_LABELS, type EtapeProjet, type Profile } from "@/lib/types";
+import { RDV_MODE_LABELS, type EtapeProjet, type Evenement, type Profile } from "@/lib/types";
+import { quandEvenement } from "@/lib/agenda";
 import { AjoutParcours } from "@/components/AjoutParcours";
 import { Avatar } from "@/components/Avatar";
 import { ChatProjet } from "@/components/ChatProjet";
@@ -163,6 +164,42 @@ export default async function MonProjetPage({ searchParams }: { searchParams: Pr
     </section>
   );
 
+  // Le prochain rendez-vous du réseau, pour que le porteur sache qu'il existe
+  // autre chose que son seul parcours.
+  const { data: evts } = await supabase
+    .from("evenements")
+    .select("*")
+    .eq("retire", false)
+    .eq("annule", false)
+    .gte("debut", new Date(maintenant()).toISOString())
+    .lte("debut", new Date(maintenant() + 45 * 86_400_000).toISOString())
+    .order("debut", { ascending: true })
+    .limit(1)
+    .returns<Evenement[]>();
+  const evenement = evts?.[0];
+  const carteEvenement = evenement && (
+    <section className="card p-5" aria-labelledby="prochain-evenement">
+      <p className="text-[15px] font-bold" style={{ color: "var(--color-primary)" }}>
+        Prochain événement ArcInnoLab
+      </p>
+      <h2 id="prochain-evenement" className="mt-1 text-[18px] font-bold">
+        {evenement.titre}
+      </h2>
+      <p className="text-[16px]" style={{ color: "#3b4452" }}>
+        {majuscule(quandEvenement(evenement))}
+        {evenement.lieu ? ` · ${evenement.lieu}` : ""}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a href={`/evenements/${evenement.id}/ics`} className="btn btn-outline">
+          Ajouter à mon agenda
+        </a>
+        <Link href="/agenda" className="btn" style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)" }}>
+          Tout l&apos;agenda
+        </Link>
+      </div>
+    </section>
+  );
+
   const carteAccompagnateur = accompagnateur && (
     <section className="card flex items-center gap-4 p-5">
       <Avatar prenom={accompagnateur.prenom} nom={accompagnateur.nom} photoUrl={accompagnateur.photo_url} size="lg" />
@@ -225,6 +262,7 @@ export default async function MonProjetPage({ searchParams }: { searchParams: Pr
           <div className="flex flex-col gap-5 lg:hidden">
             {carteRdv}
             {carteAccompagnateur}
+            {carteEvenement}
           </div>
 
           <section className="card p-5 md:p-6" aria-labelledby="parcours">
@@ -275,6 +313,7 @@ export default async function MonProjetPage({ searchParams }: { searchParams: Pr
         <aside className="hidden flex-col gap-5 lg:flex">
           {carteAccompagnateur}
           {carteRdv}
+          {carteEvenement}
           <section className="card flex flex-col overflow-hidden" aria-labelledby="echanges">
             <h2 id="echanges" className="border-b px-5 py-4 text-[18px] font-bold" style={{ borderColor: "var(--color-border)" }}>
               Vos échanges avec l&apos;équipe

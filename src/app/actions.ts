@@ -1143,3 +1143,15 @@ export async function detacherPartenaire(projetId: string, partenaireId: string)
   revalidatePath(`/projets/${projetId}`);
   revalidatePath("/mon-projet");
 }
+
+/** Active ou coupe les e-mails de notification pour soi-même. */
+export async function changerCourriels(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Session expirée : reconnectez-vous." };
+  const actifs = formData.get("courriels_actifs") === "on";
+  const { error } = await supabase.from("profiles").update({ courriels_actifs: actifs }).eq("id", user.id);
+  if (error) return { error: "Réglage non enregistré : " + error.message };
+  revalidatePath("/profil");
+  return { success: true };
+}

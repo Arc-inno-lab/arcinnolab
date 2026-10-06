@@ -40,6 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     items = [
       { href: "/mon-projet", label: "Mon projet", exact: true },
       { href: "/mon-projet/messages", label: "Messages" },
+      { href: "/agenda", label: "Agenda" },
     ];
   } else {
     const aFaire = await chargerAFaire(supabase, user.id, profile.role);
@@ -48,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: "/demandes", label: "Demandes" },
       { href: "/projets", label: "Projets" },
       { href: "/promotions", label: "Promotions" },
+      { href: "/agenda", label: "Agenda" },
       { href: "/messages", label: "Messages", badge: messagesNonLus ?? 0 },
     ];
     if (profile.role === "admin") items.push({ href: "/admin", label: "Administration" });

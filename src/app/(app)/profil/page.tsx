@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS, type Profile } from "@/lib/types";
 import { ProfilPhotoForm } from "./ProfilPhotoForm";
+import { ReglageCourriels } from "./ReglageCourriels";
 
 export default async function ProfilPage() {
   const supabase = await createClient();
@@ -27,6 +28,9 @@ export default async function ProfilPage() {
       </p>
       <div className="card p-6">
         <ProfilPhotoForm nom={profile.nom} prenom={profile.prenom} photoUrl={profile.photo_url} />
+      </div>
+      <div className="card mt-4 p-6">
+        <ReglageCourriels actifs={profile.courriels_actifs !== false} porteur={profile.role === "porteur"} />
       </div>
     </div>
   );

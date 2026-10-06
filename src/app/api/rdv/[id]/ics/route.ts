@@ -1,35 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { APP_URL } from "@/lib/config";
 import { RDV_MODE_LABELS } from "@/lib/types";
+import { horodatageIcs as horodatage, texteIcs as texte, reponseIcs } from "@/lib/ics";
 
 /**
  * « Ajouter à mon agenda » : un fichier .ics que tous les agendas savent
  * ouvrir (téléphone, Outlook, Google). La lecture passe par la RLS : on ne
  * peut télécharger que les rendez-vous d'un projet dont on fait partie.
  */
-
-function horodatage(d: Date) {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
-/** Échappement imposé par la RFC 5545 pour les champs texte. */
-function texte(v: string) {
-  return v.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-}
-
-/** Les lignes de plus de 75 octets doivent être repliées (RFC 5545, 3.1). */
-function replier(ligne: string) {
-  const morceaux: string[] = [];
-  let reste = ligne;
-  while (new TextEncoder().encode(reste).length > 73) {
-    let n = 73;
-    while (new TextEncoder().encode(reste.slice(0, n)).length > 73) n--;
-    morceaux.push(reste.slice(0, n));
-    reste = reste.slice(n);
-  }
-  morceaux.push(reste);
-  return morceaux.join("\r\n ");
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -83,11 +61,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     "END:VCALENDAR",
   ];
 
-  return new Response(lignes.map(replier).join("\r\n") + "\r\n", {
-    headers: {
-      "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="rendez-vous-arcinnolab.ics"',
-      "Cache-Control": "private, no-store",
-    },
-  });
+  return reponseIcs(lignes, "rendez-vous-arcinnolab.ics", true);
 }

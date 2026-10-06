@@ -24,6 +24,8 @@ export interface Profile {
   organisation: string | null;
   photo_url: string | null;
   created_at: string;
+  /** Reçoit les notifications par e-mail (migration 026). */
+  courriels_actifs?: boolean;
 }
 
 export interface Invitation {
@@ -358,6 +360,25 @@ export interface Promotion {
   date_debut: string | null;
   date_fin: string | null;
   places: number | null;
+}
+
+/** Un événement de l'agenda ArcInnoLab (migration 025). */
+export interface Evenement {
+  id: string;
+  titre: string;
+  description: string | null;
+  debut: string;
+  fin: string | null;
+  lieu: string | null;
+  lien: string | null;
+  organisateur: string | null;
+  /** Visible aussi sur la vitrine, sans compte. */
+  public: boolean;
+  annule: boolean;
+  retire: boolean;
+  cree_par: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Message du fil interne de l'équipe sur une demande. Le porteur ne le voit jamais. */
