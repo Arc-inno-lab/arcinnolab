@@ -819,6 +819,10 @@ export async function cloreTourVote(_prev: ActionResult, formData: FormData): Pr
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Non authentifié." };
 
+  // La base le refuse aussi (migration 029) : on le dit avant de rédiger quoi que ce soit.
+  const { data: moi } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (moi?.role !== "admin") return { error: "Seul un administrateur clôt un vote." };
+
   const { data: tour } = await supabase
     .from("tours_vote")
     .select("*")

@@ -4,7 +4,15 @@ import { useActionState } from "react";
 import { acceptInvitation } from "@/app/actions";
 import { FieldError } from "@/components/FieldError";
 
-export function AcceptInvitationForm({ token, email }: { token: string; email: string }) {
+export function AcceptInvitationForm({
+  token,
+  email,
+  identite,
+}: {
+  token: string;
+  email: string;
+  identite?: { prenom: string | null; nom: string | null; organisation: string | null };
+}) {
   const [state, formAction, pending] = useActionState(acceptInvitation, {});
 
   return (
@@ -21,20 +29,20 @@ export function AcceptInvitationForm({ token, email }: { token: string; email: s
           <label htmlFor="prenom" className="mb-1 block text-sm font-medium">
             Prénom
           </label>
-          <input id="prenom" name="prenom" required className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
+          <input id="prenom" name="prenom" required defaultValue={identite?.prenom ?? ""} autoComplete="given-name" className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
         </div>
         <div>
           <label htmlFor="nom" className="mb-1 block text-sm font-medium">
             Nom
           </label>
-          <input id="nom" name="nom" required className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
+          <input id="nom" name="nom" required defaultValue={identite?.nom ?? ""} autoComplete="family-name" className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
         </div>
       </div>
 
       <label htmlFor="organisation" className="mb-1 mt-4 block text-sm font-medium">
         Organisation <span style={{ color: "var(--color-muted)" }}>(facultatif)</span>
       </label>
-      <input id="organisation" name="organisation" className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
+      <input id="organisation" name="organisation" defaultValue={identite?.organisation ?? ""} autoComplete="organization" className="w-full rounded-md border px-3 py-2" style={{ borderColor: "var(--color-border)" }} />
 
       <label htmlFor="password" className="mb-1 mt-4 block text-sm font-medium">
         Mot de passe

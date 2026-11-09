@@ -14,6 +14,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     | { email: string; role_cible: "partenaire" | "porteur"; statut: string; date_expiration: string }
     | undefined;
 
+  // Le prénom, le nom et la structure sont souvent déjà connus (demande
+  // d'accès, dossier du porteur) : on les propose plutôt que de les redemander.
+  const { data: ident } = invitation
+    ? await supabase.rpc("get_invitation_identite", { p_token: token })
+    : { data: null };
+  const identite = (ident as { prenom: string | null; nom: string | null; organisation: string | null }[] | null)?.[0];
+
   const now = new Date();
   const expired = invitation && new Date(invitation.date_expiration) < now;
   const invalid = !invitation || invitation.statut !== "en_attente" || expired;
@@ -41,9 +48,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
               <h1 className="mb-1 text-xl font-semibold">Bienvenue sur ArcInnoLab</h1>
               <p className="mb-5 text-sm" style={{ color: "var(--color-muted)" }}>
                 Vous avez été invité·e en tant que <strong>{ROLE_LABELS[invitation.role_cible]}</strong>{" "}
-                ({invitation.email}). Créez votre mot de passe pour finaliser votre accès.
+                ({invitation.email}). Vérifiez votre nom, puis choisissez votre mot de passe pour finaliser votre accès.
               </p>
-              <AcceptInvitationForm token={token} email={invitation.email} />
+              <AcceptInvitationForm token={token} email={invitation.email} identite={identite} />
             </>
           )}
         </div>
