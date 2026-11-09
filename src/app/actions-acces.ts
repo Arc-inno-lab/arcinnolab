@@ -1,5 +1,7 @@
 "use server";
 
+import { lireTableur } from "@/lib/lire-xlsx";
+
 /**
  * Demandes d'accès à la plateforme (migration 028). Rien n'est créé sans
  * l'administrateur : le formulaire public et l'import ne déposent que des
@@ -65,13 +67,30 @@ export async function refuserDemandesAcces(ids: string[]): Promise<Resultat> {
  * Colonnes : prénom ; nom ; e-mail ; organisation ; fonction ; rôle.
  */
 export async function importerDemandesAcces(_prev: Resultat, fd: FormData): Promise<Resultat> {
-  const brut = String(fd.get("liste") || "").replace(/^﻿/, "").trim();
-  if (!brut) return { error: "Collez la liste (une personne par ligne)." };
+  // Deux entrées possibles : le fichier Excel du modèle, ou une liste collée
+  // (copier-coller depuis Excel ou un CSV).
+  const fichier = fd.get("fichier");
+  let cellules: string[][];
+  if (fichier instanceof File && fichier.size > 0) {
+    if (fichier.size > 2 * 1024 * 1024) return { error: "Fichier trop lourd (2 Mo au plus)." };
+    if (!/\.xlsx$/i.test(fichier.name)) return { error: "Choisissez un fichier Excel (.xlsx), par exemple le modèle." };
+    try {
+      cellules = lireTableur(new Uint8Array(await fichier.arrayBuffer()));
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Lecture du fichier impossible." };
+    }
+  } else {
+    const brut = String(fd.get("liste") || "").replace(/^﻿/, "").trim();
+    if (!brut) return { error: "Choisissez le fichier Excel, ou collez la liste (une personne par ligne)." };
+    const lignes = brut.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const sep = lignes[0].includes("\t") ? "\t" : lignes[0].includes(";") ? ";" : ",";
+    cellules = lignes.map((l) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, "$1")));
+  }
 
-  const lignes = brut.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const sep = lignes[0].includes("\t") ? "\t" : lignes[0].includes(";") ? ";" : ",";
-  const cellules = lignes.map((l) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, "$1")));
+  // L'en-tête et la ligne d'exemple du modèle ne sont pas des personnes.
   if (cellules.length && cellules[0].some((c) => /mail/i.test(c))) cellules.shift();
+  cellules = cellules.filter((c) => c.some(Boolean) && !/@exemple\.(fr|org|com)$/i.test((c[2] ?? "").trim()));
+  if (!cellules.length) return { error: "Aucune personne trouvée dans la liste." };
   if (cellules.length > 300) return { error: "300 lignes au plus par import." };
 
   const supabase = await createClient();
@@ -81,7 +100,7 @@ export async function importerDemandesAcces(_prev: Resultat, fd: FormData): Prom
     const [prenom = "", nom = "", email = "", organisation = "", fonction = "", role = ""] = c;
     const adresse = email.toLowerCase();
     if (!prenom || !nom || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adresse)) {
-      rejets.push(`ligne ${i + 1} (incomplète)`);
+      rejets.push(`${prenom || nom || email || "ligne " + (i + 1)} (incomplète)`);
       continue;
     }
     const { error } = await supabase.from("demandes_acces").insert({

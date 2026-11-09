@@ -44,7 +44,10 @@ export function DemandesAcces({
   const [retour, setRetour] = useState<{ ok: boolean; texte: string }>();
   const [pending, startTransition] = useTransition();
   const [copie, setCopie] = useState(false);
-  const imp = useEnvoi(importerDemandesAcces);
+  const [bilanImport, setBilanImport] = useState<string | null>(null);
+  const imp = useEnvoi(importerDemandesAcces, {
+    onSucces: (_f, _fd, r) => setBilanImport((r as { message?: string }).message ?? null),
+  });
 
   const tout = enAttente.length > 0 && coches.size === enAttente.length;
   const basculer = (id: string) =>
@@ -107,8 +110,8 @@ export function DemandesAcces({
           <button type="button" onClick={qr} className="btn btn-outline text-xs" style={{ minHeight: 36 }}>
             QR code
           </button>
-          <a href="/modele-comptes-arcinnolab.csv" download className="btn btn-outline text-xs" style={{ minHeight: 36 }}>
-            Modèle CSV
+          <a href="/modele-comptes-arcinnolab.xlsx" download className="btn btn-outline text-xs" style={{ minHeight: 36 }}>
+            Modèle Excel
           </a>
         </div>
       </div>
@@ -212,23 +215,39 @@ export function DemandesAcces({
       )}
 
       <details className="card mt-4 p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Importer une liste (Excel ou CSV)</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Importer une liste Excel</summary>
         <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
-          Remplissez le modèle (prénom ; nom ; e-mail ; structure ; fonction ; rôle), puis copiez les lignes depuis Excel et
-          collez-les ici. Chaque ligne devient une demande à valider ci-dessus, pas un compte.
+          Envoyez le <a href="/modele-comptes-arcinnolab.xlsx" download className="font-semibold" style={{ color: "var(--color-primary)" }}>modèle Excel</a>{" "}
+          aux structures partenaires, puis importez ici le fichier rempli. Chaque ligne devient une demande à valider
+          ci-dessus, pas un compte.
         </p>
-        <form onSubmit={imp.onSubmit} className="mt-3 flex flex-col gap-2">
-          <label htmlFor="liste-import" className="sr-only">
-            Liste à importer
+        <form onSubmit={imp.onSubmit} className="mt-3 flex flex-col gap-3">
+          <label htmlFor="fichier-import" className="text-sm font-semibold">
+            Fichier Excel rempli (.xlsx)
           </label>
-          <textarea
-            id="liste-import"
-            name="liste"
-            rows={6}
-            placeholder={"Marie;Exemple;marie@structure.ch;Haute École Arc;Chargée d'innovation;partenaire"}
-            className="w-full rounded-md border px-3 py-2 font-mono text-xs"
-            style={{ borderColor: "var(--color-border)" }}
+          <input
+            id="fichier-import"
+            name="fichier"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="text-sm"
           />
+          <details>
+            <summary className="cursor-pointer text-sm" style={{ color: "var(--color-muted)" }}>
+              Ou coller des lignes copiées depuis Excel
+            </summary>
+            <label htmlFor="liste-import" className="sr-only">
+              Lignes à importer
+            </label>
+            <textarea
+              id="liste-import"
+              name="liste"
+              rows={5}
+              placeholder={"Prénom, nom, e-mail, structure, fonction, rôle : une personne par ligne"}
+              className="mt-2 w-full rounded-md border px-3 py-2 font-mono text-xs"
+              style={{ borderColor: "var(--color-border)" }}
+            />
+          </details>
           {imp.erreur && (
             <p role="alert" className="text-sm font-semibold" style={{ color: "var(--color-danger)" }}>
               {imp.erreur}
@@ -236,7 +255,7 @@ export function DemandesAcces({
           )}
           {imp.succes && (
             <p role="status" className="text-sm font-semibold" style={{ color: "var(--color-success)" }}>
-              Import terminé : la liste est à valider ci-dessus.
+              {bilanImport ?? "Import terminé : la liste est à valider ci-dessus."}
             </p>
           )}
           <div>
