@@ -5,6 +5,8 @@ import { chargerMonProjet, type Personne } from "@/lib/mon-projet";
 import { aujourdhuiIso, estEnRetard, heure, jourCourt, jourLong, lireParcours, ordreParcours } from "@/lib/parcours";
 import { RDV_MODE_LABELS, type EtapeProjet, type Evenement, type Profile } from "@/lib/types";
 import { quandEvenement } from "@/lib/agenda";
+import { chargerHistorique } from "@/lib/historique";
+import { HistoriqueDemande } from "@/components/HistoriqueDemande";
 import { AjoutParcours } from "@/components/AjoutParcours";
 import { Avatar } from "@/components/Avatar";
 import { ChatProjet } from "@/components/ChatProjet";
@@ -177,6 +179,7 @@ export default async function MonProjetPage({ searchParams }: { searchParams: Pr
     .limit(1)
     .returns<Evenement[]>();
   const evenement = evts?.[0];
+  const historique = await chargerHistorique(supabase, projet.id);
   const carteEvenement = evenement && (
     <section className="card p-5" aria-labelledby="prochain-evenement">
       <p className="text-[15px] font-bold" style={{ color: "var(--color-primary)" }}>
@@ -308,6 +311,8 @@ export default async function MonProjetPage({ searchParams }: { searchParams: Pr
               />
             </div>
           </section>
+
+          <HistoriqueDemande lignes={historique} grand />
         </div>
 
         <aside className="hidden flex-col gap-5 lg:flex">

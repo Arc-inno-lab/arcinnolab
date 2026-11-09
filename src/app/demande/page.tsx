@@ -20,7 +20,34 @@ import {
   SOLUTIONS,
   CONTACT_EMAIL,
   LINKEDIN,
+  LINKTREE,
+  LIEU_SAFED,
+  PROJET_TEMOIN,
 } from "./contenu";
+
+type ProjetVitrine = { id: string; titre: string; resume: string; logo_url: string | null; lien: string | null };
+
+function ecrireAProposDe(titre: string) {
+  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Prendre contact : ${titre}`)}&body=${encodeURIComponent(
+    `Bonjour,\n\nJe souhaite prendre contact au sujet du projet « ${titre} ».\n\n`
+  )}`;
+}
+
+function IconeLinkedIn({ taille = 18 }: { taille?: number }) {
+  return (
+    <svg width={taille} height={taille} viewBox="0 0 24 24" fill="#0a66c2" aria-hidden="true">
+      <path d="M20.4 3H3.6A.6.6 0 0 0 3 3.6v16.8c0 .3.3.6.6.6h16.8c.3 0 .6-.3.6-.6V3.6a.6.6 0 0 0-.6-.6ZM8.3 18.3H5.7V9.8h2.6v8.5ZM7 8.6a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm11.3 9.7h-2.6v-4.1c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.2h-2.6V9.8h2.5v1.2c.4-.7 1.2-1.4 2.5-1.4 2.7 0 3.2 1.8 3.2 4.1v4.6Z" />
+    </svg>
+  );
+}
+
+function IconeLiens({ taille = 18 }: { taille?: number }) {
+  return (
+    <svg width={taille} height={taille} viewBox="0 0 24 24" fill="none" stroke="#43a047" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 3v18M5 7l7-4 7 4M5 12h14M7 17h10" />
+    </svg>
+  );
+}
 
 export const metadata: Metadata = {
   title: "ArcInnoLab — L'innovation au service des transitions de l'Arc jurassien",
@@ -60,6 +87,11 @@ export default async function DemandePage() {
     .returns<Evenement[]>();
   const evenements = data ?? [];
 
+  // Les projets que l'équipe a choisi de montrer : titre, résumé public et logo,
+  // rien d'autre (fonction projets_vitrine, migration 027).
+  const { data: pv } = await supabase.rpc("projets_vitrine");
+  const projets = ((pv as ProjetVitrine[] | null) ?? []).slice(0, 6);
+
   return (
     <div className="vitrine">
       {/* ── En-tête ─────────────────────────────────────────────── */}
@@ -73,6 +105,7 @@ export default async function DemandePage() {
             <a href="#fonctionnement" style={{ color: "inherit" }}>Comment ça marche</a>
             <a href="#solutions" style={{ color: "inherit" }}>Nos solutions</a>
             <a href="#partenaires" style={{ color: "inherit" }}>Partenaires</a>
+            <a href="#projets" style={{ color: "inherit" }}>Projets</a>
             {evenements.length > 0 && (
               <a href="#agenda" style={{ color: "inherit" }}>Agenda</a>
             )}
@@ -328,6 +361,31 @@ export default async function DemandePage() {
                     </p>
                   </li>
                 ))}
+                <li className="vit-carte flex flex-col p-5" style={{ outline: "2px solid var(--color-primary)", outlineOffset: -2 }}>
+                  <div className="flex h-14 items-center gap-3">
+                    <img src="/brand/logo-arcinnolab-serre.svg" alt="ArcInnoLab" className="h-12 w-auto" />
+                  </div>
+                  <p className="mt-3 font-bold">{LIEU_SAFED.nom}</p>
+                  <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                    <span className="mr-1 inline-block rounded px-1.5 text-[11px] font-bold text-white" style={{ background: "var(--color-accent)" }}>
+                      CH
+                    </span>
+                    {LIEU_SAFED.lieu}
+                  </p>
+                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {LIEU_SAFED.thematiques.map((t) => (
+                      <li key={t} className="vit-puce">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-sm leading-relaxed" style={{ color: "#3b4452" }}>
+                    {LIEU_SAFED.services.join(" · ")}
+                  </p>
+                  <a href={LIEU_SAFED.itineraire} target="_blank" rel="noopener noreferrer" className="mt-3 text-sm font-semibold">
+                    Itinéraire ↗
+                  </a>
+                </li>
                 <li className="flex flex-col justify-center rounded-[1.25rem] p-5 text-white" style={{ background: "var(--vit-navy)" }}>
                   <p className="text-lg font-bold">Et tout un écosystème</p>
                   <p className="mt-1 text-sm opacity-90">
@@ -336,6 +394,81 @@ export default async function DemandePage() {
                   </p>
                 </li>
               </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Projets accompagnés ─────────────────────────────── */}
+        <section id="projets" className="vit-section scroll-mt-20">
+          <div className="vit-conteneur">
+            <p className="vit-kicker">Projets accompagnés</p>
+            <h2 className="mt-2 max-w-3xl text-3xl font-bold md:text-4xl">Ils avancent avec ArcInnoLab</h2>
+            <p className="mt-4 max-w-3xl text-lg leading-relaxed" style={{ color: "#3b4452" }}>
+              Des projets de la transition, portés de part et d&apos;autre de la frontière. Un projet vous intéresse ?
+              Écrivez-nous : nous faisons le lien.
+            </p>
+            <ul className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {(projets.length
+                ? projets.map((p) => ({ cle: p.id, titre: p.titre, resume: p.resume, logo: p.logo_url, lien: p.lien, temoin: false }))
+                : [{ cle: "temoin", titre: PROJET_TEMOIN.titre, resume: PROJET_TEMOIN.resume, logo: null, lien: null, temoin: true }]
+              ).map((p) => (
+                <li key={p.cle} className="vit-carte flex flex-col p-5">
+                  <div className="flex items-center gap-3">
+                    {p.logo ? (
+                      <img src={p.logo} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                    ) : p.temoin ? (
+                      <img src="/brand/logo-arcinnolab-serre.svg" alt="" className="h-14 w-auto" />
+                    ) : (
+                      <span
+                        className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-extrabold text-white"
+                        style={{ background: "var(--color-primary)" }}
+                        aria-hidden="true"
+                      >
+                        {p.titre.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <p className="text-lg font-bold leading-snug">{p.titre}</p>
+                  </div>
+                  <p className="mt-3 flex-1 text-[15px] leading-relaxed" style={{ color: "#3b4452" }}>
+                    {p.resume}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {p.temoin ? (
+                      <a href="#deposer" className="btn btn-primary">
+                        Déposer mon projet
+                      </a>
+                    ) : null}
+                    <a href={ecrireAProposDe(p.titre)} className="btn btn-outline">
+                      Prendre contact
+                    </a>
+                    {p.lien && (
+                      <a href={p.lien} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                        Site du projet ↗
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ── Restez connectés ──────────────────────────────────── */}
+        <section aria-labelledby="reseaux" className="px-4 py-10" style={{ background: "var(--vit-navy)" }}>
+          <div className="vit-conteneur flex flex-col items-start gap-6 text-white md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 id="reseaux" className="text-2xl font-bold">
+                Suivez ArcInnoLab
+              </h2>
+              <p className="mt-1 opacity-90">Actualités, appels à projets, événements : tous nos liens au même endroit.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <a href={LINKEDIN} target="_blank" rel="noopener noreferrer" className="btn btn-grand bg-white" style={{ color: "var(--vit-navy)" }}>
+                <IconeLinkedIn taille={20} /> LinkedIn
+              </a>
+              <a href={LINKTREE} target="_blank" rel="noopener noreferrer" className="btn btn-grand bg-white" style={{ color: "var(--vit-navy)" }}>
+                <IconeLiens taille={20} /> Tous nos liens
+              </a>
             </div>
           </div>
         </section>
@@ -402,10 +535,14 @@ export default async function DemandePage() {
             <ul className="mt-3 flex flex-col gap-2 text-sm">
               <li>
                 <a href={LINKEDIN} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-semibold">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#0a66c2" aria-hidden="true">
-                    <path d="M20.4 3H3.6A.6.6 0 0 0 3 3.6v16.8c0 .3.3.6.6.6h16.8c.3 0 .6-.3.6-.6V3.6a.6.6 0 0 0-.6-.6ZM8.3 18.3H5.7V9.8h2.6v8.5ZM7 8.6a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm11.3 9.7h-2.6v-4.1c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.2h-2.6V9.8h2.5v1.2c.4-.7 1.2-1.4 2.5-1.4 2.7 0 3.2 1.8 3.2 4.1v4.6Z" />
-                  </svg>
+                  <IconeLinkedIn />
                   Suivre ArcInnoLab sur LinkedIn
+                </a>
+              </li>
+              <li>
+                <a href={LINKTREE} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-semibold">
+                  <IconeLiens />
+                  Tous nos liens (Linktree)
                 </a>
               </li>
               <li>

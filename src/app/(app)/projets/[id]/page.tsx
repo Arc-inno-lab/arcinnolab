@@ -17,6 +17,7 @@ import { FilProjet } from "./FilProjet";
 import { ProjetLogoUpload } from "./ProjetLogoUpload";
 import { DescriptionProjet } from "./DescriptionProjet";
 import { EquipeProjet } from "./EquipeProjet";
+import { VitrineProjet } from "./VitrineProjet";
 
 type ProjetAvecReferent = Projet & {
   referent: Pick<Profile, "nom" | "prenom" | "email" | "photo_url"> | null;
@@ -227,6 +228,15 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
             messagesParEtape={messagesParEtape}
             documentsParEtape={documentsParEtape}
           />
+
+          {peutGerer && (
+            <VitrineProjet
+              projetId={projet.id}
+              visible={projet.vitrine_visible ?? false}
+              resume={projet.vitrine_resume ?? null}
+              lien={projet.vitrine_lien ?? null}
+            />
+          )}
         </div>
 
         <FilProjet projetId={projet.id} messages={messages ?? []} />

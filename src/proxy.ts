@@ -52,6 +52,9 @@ export async function proxy(request: NextRequest) {
     // Le fichier « Ajouter à mon agenda » d'un événement : public pour les
     // événements publics, la RLS refusant les autres à qui n'est pas connecté.
     "/evenements",
+    // Le formulaire « Rejoindre ArcInnoLab » : une demande d'accès, jamais un
+    // compte. Rien n'est créé avant la validation de l'administrateur (migration 028).
+    "/rejoindre",
   ];
 
   // La comparaison est volontairement stricte : chemin identique, ou suivi d'un
@@ -61,6 +64,14 @@ export async function proxy(request: NextRequest) {
   // le rend d'autant plus facile à manquer.
   const chemin = request.nextUrl.pathname;
   const isPublic = publicPaths.some((p) => chemin === p || chemin.startsWith(p + "/"));
+
+  // L'adresse du site, tapée ou scannée sur une affiche, ouvre la vitrine pour
+  // un visiteur. Les membres connectés y retrouvent leur page « À faire ».
+  if (!user && chemin === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/demande";
+    return NextResponse.rewrite(url);
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
@@ -78,5 +89,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|csv)$).*)"],
 };

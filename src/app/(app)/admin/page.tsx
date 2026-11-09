@@ -5,6 +5,8 @@ import type { Profile, Invitation } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/types";
 import { CancelInvitationButton } from "./CancelInvitationButton";
 import { GestionCompte } from "./GestionCompte";
+import { DemandesAcces, type DemandeAcces } from "./DemandesAcces";
+import { APP_URL } from "@/lib/config";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -25,6 +27,16 @@ export default async function AdminPage() {
     .order("date_envoi", { ascending: false })
     .returns<Invitation[]>();
 
+  // Demandes d'accès (migration 028) : en attente d'abord, puis les dernières traitées.
+  const { data: acces } = await supabase
+    .from("demandes_acces")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(200)
+    .returns<DemandeAcces[]>();
+  const accesEnAttente = (acces ?? []).filter((d) => d.statut === "en_attente").reverse();
+  const accesTraites = (acces ?? []).filter((d) => d.statut !== "en_attente").slice(0, 20);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -43,6 +55,8 @@ export default async function AdminPage() {
           Ouvrir les promotions
         </Link>
       </section>
+
+      <DemandesAcces enAttente={accesEnAttente} traitees={accesTraites} lienFormulaire={`${APP_URL}/rejoindre`} />
 
       <section aria-labelledby="comptes-heading" className="mb-10">
         <h2 id="comptes-heading" className="mb-3 text-lg font-medium">

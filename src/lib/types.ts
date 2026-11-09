@@ -51,6 +51,10 @@ export interface Projet {
   date_creation: string;
   id_partenaire_createur: string;
   logo_url: string | null;
+  // Vitrine publique (migration 027) : seulement si l'équipe le décide.
+  vitrine_visible?: boolean;
+  vitrine_resume?: string | null;
+  vitrine_lien?: string | null;
 }
 
 export interface MembreProjet {

@@ -182,8 +182,14 @@ export default async function SuiviPage({ params }: { params: Promise<{ token: s
   const { token } = await params;
   const supabase = await createClient();
 
+  // Admis sans compte : la fonction lui garantit un lien d'accès valable (elle
+  // en refait un si le précédent a expiré). Appelée avant get_suivi_demande,
+  // qui saura alors s'il est déjà rattaché à son projet.
+  const { data: jetonAcces } = await supabase.rpc("lien_acces_porteur", { p_token: token });
+
   const { data } = await supabase.rpc("get_suivi_demande", { p_token: token });
-  const suivi = (data as Suivi[] | null)?.[0];
+  const brut = (data as Suivi[] | null)?.[0];
+  const suivi = brut ? { ...brut, invitation_token: (jetonAcces as string | null) ?? brut.invitation_token } : brut;
 
   const { data: fil } = await supabase.rpc("get_messages_suivi", { p_token: token });
   const messages = (fil as MessageSuivi[] | null) ?? [];
@@ -321,7 +327,10 @@ function Contenu({
           <div className="mt-4">
             {suivi.a_deja_un_acces ? (
               <>
-                <p className="mb-3">Votre espace projet est prêt : vos étapes, vos rendez-vous et vos échanges vous y attendent.</p>
+                <p className="mb-3">
+                  Votre espace projet est prêt : votre parcours, vos rendez-vous, vos documents et vos échanges avec l&apos;équipe.
+                  L&apos;historique de cette demande vous y suit.
+                </p>
                 <Link href="/login" className="btn btn-primary btn-grand w-full">
                   Accéder à mon espace
                 </Link>
@@ -329,8 +338,9 @@ function Contenu({
             ) : suivi.invitation_token ? (
               <>
                 <p className="mb-3">
-                  Votre espace projet vous attend : vos étapes, vos rendez-vous et vos échanges avec
-                  {coach ? ` ${coach}` : " votre accompagnateur"}, au même endroit.
+                  Votre espace projet vous attend. Vous y suivrez votre parcours étape par étape, prendrez vos rendez-vous,
+                  déposerez vos documents et échangerez avec {coach ?? "votre accompagnateur"} et l&apos;équipe — et vous
+                  y retrouverez l&apos;historique de cette demande. Il ne reste qu&apos;à choisir votre mot de passe.
                 </p>
                 <Link href={`/invite/${suivi.invitation_token}`} className="btn btn-primary btn-grand w-full">
                   Créer mon accès

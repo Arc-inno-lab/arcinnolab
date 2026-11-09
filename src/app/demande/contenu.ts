@@ -157,3 +157,20 @@ export const FINANCEMENT =
 
 export const CONTACT_EMAIL = "arcinnolab@gmail.com";
 export const LINKEDIN = "https://www.linkedin.com/showcase/arcinnolab";
+export const LINKTREE = "https://linktr.ee/ArcInnoLab";
+
+/** Le lieu ArcInnoLab de Delémont, présenté comme les partenaires. */
+export const LIEU_SAFED = {
+  nom: "Espace ArcInnoLab · SAFED",
+  lieu: "Delémont — bâtiment SAFED, site Gare Sud",
+  thematiques: ["Lieu d'accueil ArcInnoLab", "Innovation", "Économie circulaire"],
+  services: ["Accueil des porteurs de projets", "Rendez-vous avec l'équipe", "Ateliers et événements du réseau"],
+  itineraire: "https://www.google.com/maps/search/?api=1&query=SAFED%20Gare%20Sud%20Del%C3%A9mont",
+};
+
+/** Le projet témoin affiché tant qu'aucun projet n'a été publié sur la vitrine. */
+export const PROJET_TEMOIN = {
+  titre: "Mon projet ArcInnoLab",
+  resume:
+    "Votre projet pourrait être le prochain : déposez-le en trois minutes, un accompagnateur vous répond, et il rejoint les projets accompagnés par le réseau ArcInnoLab, de part et d'autre de la frontière.",
+};

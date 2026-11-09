@@ -1155,3 +1155,27 @@ export async function changerCourriels(_prev: ActionResult, formData: FormData):
   revalidatePath("/profil");
   return { success: true };
 }
+
+/** Afficher (ou non) un projet sur la vitrine publique, avec son résumé public. */
+export async function enregistrerVitrineProjet(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const projetId = String(formData.get("projet_id") || "");
+  const visible = formData.get("vitrine_visible") === "on";
+  const resume = String(formData.get("vitrine_resume") || "").trim();
+  const lien = String(formData.get("vitrine_lien") || "").trim();
+  if (!projetId) return { error: "Projet introuvable." };
+  if (resume.length > 400) return { error: "Le résumé public fait 400 caractères au plus." };
+  if (visible && resume.length < 30) return { error: "Rédigez un résumé public (30 caractères au moins) avant d'afficher le projet." };
+  if (lien && !/^https?:\/\//i.test(lien)) return { error: "Le lien doit commencer par https://" };
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("projets")
+    .update({ vitrine_visible: visible, vitrine_resume: resume || null, vitrine_lien: lien || null })
+    .eq("id", projetId)
+    .select("id");
+  if (error) return { error: error.message.includes("référent") ? "Seuls le référent et l'administrateur décident de la vitrine." : error.message };
+  if (!data?.length) return { error: "Seuls le référent et l'administrateur décident de la vitrine." };
+  revalidatePath(`/projets/${projetId}`);
+  revalidatePath("/demande");
+  return { success: true };
+}
