@@ -117,7 +117,7 @@ export function ChatProjet({
                       </p>
                     )}
                     <span className="text-xs" style={{ color: "var(--color-muted)" }}>
-                      {mien ? "Vous" : (m.auteur?.prenom ?? "L'équipe")} · {heureDe(m.created_at)}
+                      {mien ? "Vous" : !m.auteur_id ? "Ancien membre" : (m.auteur?.prenom ?? "L'équipe")} · {heureDe(m.created_at)}
                     </span>
                   </div>
                 </li>

@@ -1018,6 +1018,23 @@ export async function appliquerReinitialisation(
 }
 
 /** Change le rôle d'un compte. Réservé à l'admin par la RLS et le trigger. */
+// ------------------------------------------------------------------
+// Supprimer un compte (migration 030). Tout se joue dans la fonction en base :
+// contrôle administrateur, refus de soi-même et des administrateurs, reprise
+// des projets et invitations par l'administrateur, puis suppression.
+// ------------------------------------------------------------------
+export async function supprimerCompte(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const userId = String(formData.get("user_id") || "");
+  if (!userId) return { error: "Compte introuvable." };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase.rpc("supprimer_compte", { p_user: userId });
+  if (error) return { error: error.code === "P0001" ? error.message : "Suppression impossible : " + error.message };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
 export async function changerRole(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const userId = String(formData.get("user_id") || "");
   const role = String(formData.get("role") || "");

@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { changerRole, creerLienReinitialisation } from "@/app/actions";
+import { changerRole, creerLienReinitialisation, supprimerCompte } from "@/app/actions";
 import type { Profile } from "@/lib/types";
 
 /**
- * Les deux seules opérations dont un administrateur a réellement besoin sur un
- * compte : corriger un rôle, et débloquer quelqu'un qui ne peut plus se
- * connecter.
+ * Ce qu'un administrateur fait sur un compte : corriger un rôle, débloquer
+ * quelqu'un qui ne peut plus se connecter, et supprimer un compte (partenaire
+ * qui s'en va, compte créé par erreur — migration 030).
  *
  * Le lien de réinitialisation est affiché ici plutôt qu'envoyé par e-mail :
  * tant que la plateforme n'a pas de service d'envoi, un mot de passe oublié
@@ -17,6 +17,8 @@ import type { Profile } from "@/lib/types";
 export function GestionCompte({ profil, estMoi }: { profil: Profile; estMoi: boolean }) {
   const [etatRole, actionRole, roleEnCours] = useActionState(changerRole, {});
   const [etatLien, actionLien, lienEnCours] = useActionState(creerLienReinitialisation, {});
+  const [etatSuppr, actionSuppr, supprEnCours] = useActionState(supprimerCompte, {});
+  const [confirmer, setConfirmer] = useState(false);
   const [copie, setCopie] = useState(false);
 
   async function copier(lien: string) {
@@ -64,7 +66,48 @@ export function GestionCompte({ profil, estMoi }: { profil: Profile; estMoi: boo
             {lienEnCours ? "…" : "Lien de connexion"}
           </button>
         </form>
+
+        {!estMoi && profil.role !== "admin" && !confirmer && (
+          <button
+            type="button"
+            onClick={() => setConfirmer(true)}
+            className="btn btn-outline text-xs"
+            style={{ color: "var(--color-danger)" }}
+          >
+            Supprimer…
+          </button>
+        )}
       </div>
+
+      {confirmer && !etatSuppr.success && (
+        <form action={actionSuppr} className="rounded-md p-3 text-xs" style={{ background: "var(--color-accent-soft)" }}>
+          <input type="hidden" name="user_id" value={profil.id} />
+          <p className="mb-2" style={{ color: "var(--color-text)" }}>
+            Supprimer définitivement le compte de <strong>{profil.prenom} {profil.nom}</strong> ? Ses projets
+            de référent et ses invitations vous reviennent, ses messages dans les projets restent signés
+            « Ancien membre ». Ses messages directs sont effacés. Cette action ne peut pas être annulée.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={supprEnCours} className="btn btn-danger text-xs">
+              {supprEnCours ? "Suppression…" : "Supprimer définitivement"}
+            </button>
+            <button type="button" onClick={() => setConfirmer(false)} className="btn btn-outline text-xs">
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
+
+      {etatSuppr.error && (
+        <p className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {etatSuppr.error}
+        </p>
+      )}
+      {!estMoi && profil.role === "admin" && (
+        <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+          Pour supprimer un administrateur, passez d&apos;abord son rôle à Partenaire.
+        </p>
+      )}
 
       {estMoi && (
         <p className="text-xs" style={{ color: "var(--color-muted)" }}>

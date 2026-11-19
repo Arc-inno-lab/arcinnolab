@@ -133,7 +133,8 @@ export interface MessageProjet {
   id: string;
   projet_id: string;
   etape_id: string | null;
-  auteur_id: string;
+  /** Vide quand l'auteur a supprimé son compte (migration 030). */
+  auteur_id: string | null;
   contenu: string;
   created_at: string;
   auteur?: Pick<Profile, "nom" | "prenom" | "role" | "photo_url"> | null;
